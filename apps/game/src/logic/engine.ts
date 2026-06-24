@@ -515,6 +515,25 @@ export async function saveStats(store: KeyValueStore, stats: AllStats): Promise<
   await store.setItem(STATS_KEY, JSON.stringify(stats));
 }
 
+// --- Daily challenge: one attempt per day --------------------------------------
+
+const DAILY_DONE_KEY = "twenty-something:daily-done";
+
+/** The dayKey of the last completed daily challenge, or null if never played. */
+export async function loadDailyDone(store: KeyValueStore): Promise<string | null> {
+  return store.getItem(DAILY_DONE_KEY);
+}
+
+/** Record that today's daily challenge has been completed. */
+export async function saveDailyDone(store: KeyValueStore, dayKey: string): Promise<void> {
+  await store.setItem(DAILY_DONE_KEY, dayKey);
+}
+
+/** Whether the daily challenge for `todayKey` has already been played. */
+export function isDailyDone(lastDailyKey: string | null, todayKey: string): boolean {
+  return lastDailyKey === todayKey;
+}
+
 function num(x: unknown, floor = 0): number {
   return typeof x === "number" && Number.isFinite(x) && x >= floor ? x : floor;
 }

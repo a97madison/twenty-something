@@ -6,6 +6,9 @@ import {
   saveStats,
   emptyStats,
   allTimeRollup,
+  loadDailyDone,
+  saveDailyDone,
+  isDailyDone,
   type KeyValueStore,
   type AllStats,
 } from "./engine.ts";
@@ -69,6 +72,18 @@ test("corrupt JSON falls back to empty stats instead of throwing", async () => {
   const key = await statsKey(store);
   store.map.set(key, "{not valid json");
   assert.deepEqual(await loadStats(store), emptyStats());
+});
+
+test("daily-done: unset until saved, then gates today (one attempt per day)", async () => {
+  const store = memStore();
+  assert.equal(await loadDailyDone(store), null);
+  assert.equal(isDailyDone(null, "2026-06-24"), false);
+
+  await saveDailyDone(store, "2026-06-24");
+  const last = await loadDailyDone(store);
+  assert.equal(last, "2026-06-24");
+  assert.equal(isDailyDone(last, "2026-06-24"), true); // played today → locked
+  assert.equal(isDailyDone(last, "2026-06-25"), false); // new day → playable again
 });
 
 test("junk values are sanitized: negatives/NaN/strings drop to defaults", async () => {
