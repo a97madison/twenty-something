@@ -2,15 +2,33 @@
   "name": "@twenty-something/game",
   "version": "0.1.0",
   "private": true,
-  "description": "20-Something single-player game — offline timed solving with streaks. The pure game-logic module (node-tested) lands first; Expo/RN screens follow in step 3.",
+  "main": "index.ts",
+  "description": "20-Something single-player game — offline timed solving with streaks. Expo/React Native, reuses @twenty-something/ui input components and the pure @twenty-something/core engine; its own game logic lives in src/logic.",
   "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
     "test": "node --test --experimental-strip-types src/logic/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@twenty-something/core": "*"
+    "@expo/metro-runtime": "~56.0.15",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@twenty-something/core": "*",
+    "@twenty-something/ui": "*",
+    "expo": "^56.0.12",
+    "expo-haptics": "~56.0.3",
+    "expo-status-bar": "~56.0.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.2.0",
     "typescript": "^5.7.0"
   }
 }

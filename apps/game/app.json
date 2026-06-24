@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "20-Something",
+    "slug": "twenty-something-game",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "twentysomethinggame",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#efeade"
+    },
+    "ios": {
+      "bundleIdentifier": "com.twentysomething.game",
+      "supportsTablet": true,
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.twentysomething.game",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#efeade"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
