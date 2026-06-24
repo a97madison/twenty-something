@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, fonts } from "@twenty-something/ui";
+import { colors } from "@twenty-something/ui";
 
 import { MAX_STARS } from "../logic";
 
@@ -35,6 +35,8 @@ export function RatingStars({ value, size = 22 }: Props) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 2 },
-  star: { color: colors.accent, fontFamily: fonts.serif },
+  // No custom fontFamily: ★/☆ aren't in the serif face, so fall back to the
+  // system font, which has them. (The numeric rating beside the row is serif.)
+  star: { color: colors.accent },
   dim: { color: colors.inkFaint },
 });

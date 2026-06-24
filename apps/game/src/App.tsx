@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import type { Variant } from "@twenty-something/core";
-import { colors } from "@twenty-something/ui";
+import { colors, useAppFonts } from "@twenty-something/ui";
 
 import {
   dealHands,
@@ -112,6 +112,9 @@ export default function App() {
     if (config.mode === "daily") startDaily();
     else startPractice(config.variant, config.count);
   };
+
+  const [fontsLoaded] = useAppFonts();
+  if (!fontsLoaded) return null; // hold first paint until the bundled fonts are ready
 
   return (
     <SafeAreaProvider>

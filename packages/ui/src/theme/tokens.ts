@@ -29,15 +29,21 @@ export const colors = {
 } as const;
 
 /**
- * Font families. The actual font files are loaded at app start; these names
- * are placeholders for a serif display face + system fallbacks. The prototype
- * used Georgia; on device we'll bundle a comparable serif. Mono is for the
- * math expressions, sans for utility labels.
+ * Font families. The serif (Fraunces) and mono (IBM Plex Mono) faces are bundled
+ * and loaded at app start via `useAppFonts()` (see fonts.ts) — real cross-platform
+ * typography, not the old iOS-only Georgia/Menlo placeholders. Each weight is a
+ * distinct family because custom fonts don't synthesize bold on Android/web, so
+ * styles set e.g. `fontFamily: fonts.serifBold` instead of `fontWeight: "700"`.
+ * Sans stays on the System font on purpose — native SF/Roboto is ideal for the
+ * tiny utility labels and costs no bundle weight.
  */
 export const fonts = {
-  serif: "Georgia", // display: wordmark, target, card pips, buttons, verdicts
-  mono: "Menlo", // math expressions
-  sans: "System", // small utility labels
+  serif: "Fraunces-Regular", // display body / dimmed numerals
+  serifSemibold: "Fraunces-SemiBold", // medium-emphasis labels, op keys
+  serifBold: "Fraunces-Bold", // wordmark, targets, buttons, headings, verdicts
+  mono: "IBMPlexMono-Regular", // math expressions
+  monoMedium: "IBMPlexMono-Medium", // keypad glyphs / backspace
+  sans: "System", // small utility labels (native font, by design)
 } as const;
 
 export const radius = {

@@ -99,9 +99,8 @@ const styles = StyleSheet.create({
   },
   chipActive: { borderColor: colors.accent, borderWidth: 1.5, backgroundColor: "#e8efe7" },
   chipText: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.serifBold,
     fontSize: 22,
-    fontWeight: "700",
     color: colors.ink,
     textAlign: "center",
     lineHeight: 22,

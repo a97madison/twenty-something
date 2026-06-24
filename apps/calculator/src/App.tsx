@@ -9,7 +9,7 @@ import {
   type Card as CardModel,
 } from "@twenty-something/core";
 
-import { colors, fonts, CardRow } from "@twenty-something/ui";
+import { colors, fonts, CardRow, useAppFonts } from "@twenty-something/ui";
 import type { CheckerToken, CardToken } from "@twenty-something/ui";
 import { randomHand } from "./hand";
 import { ValuePicker } from "./components/ValuePicker";
@@ -88,6 +88,9 @@ export default function App() {
     // target changed → prior verdict is stale, but the expression stays valid
     setVerdict(null);
   }, []);
+
+  const [fontsLoaded] = useAppFonts();
+  if (!fontsLoaded) return null; // hold first paint until the bundled fonts are ready
 
   return (
     <SafeAreaProvider>
@@ -231,9 +234,9 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     justifyContent: "space-between",
   },
-  wordmark: { fontFamily: fonts.serif, fontSize: 21, fontWeight: "700", color: colors.ink },
+  wordmark: { fontFamily: fonts.serifBold, fontSize: 21, color: colors.ink },
   wordmarkDot: { color: colors.accent },
-  tagline: { fontFamily: fonts.serif, fontStyle: "italic", fontSize: 12, color: colors.inkFaint },
+  tagline: { fontFamily: fonts.serif, fontSize: 12, color: colors.inkFaint },
   modebar: {
     flexDirection: "row",
     gap: 4,
@@ -263,6 +266,6 @@ const styles = StyleSheet.create({
   variantDesc: { fontFamily: fonts.sans, fontSize: 11, color: colors.inkFaint, marginTop: 2 },
   targetReadout: { alignItems: "center", marginTop: 6, marginBottom: 20 },
   targetLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.5, color: colors.inkFaint },
-  targetNum: { fontFamily: fonts.serif, fontSize: 50, fontWeight: "700", color: colors.accent, marginTop: 4 },
+  targetNum: { fontFamily: fonts.serifBold, fontSize: 50, color: colors.accent, marginTop: 4 },
   cardsLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1, color: colors.inkFaint, marginBottom: 8, marginHorizontal: 2 },
 });

@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 24 },
   back: { paddingTop: 8, paddingBottom: 4 },
   backText: { fontFamily: fonts.sans, fontSize: 15, color: colors.inkDim },
-  title: { fontFamily: fonts.serif, fontSize: 30, fontWeight: "700", color: colors.ink, marginTop: 12, marginBottom: 28 },
+  title: { fontFamily: fonts.serifBold, fontSize: 30, color: colors.ink, marginTop: 12, marginBottom: 28 },
   label: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.4, color: colors.inkFaint, marginBottom: 10, marginTop: 18 },
   choiceRow: { flexDirection: "row", gap: 10 },
   choice: {
@@ -80,9 +80,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   choiceOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  choiceText: { fontFamily: fonts.serif, fontSize: 16, fontWeight: "600", color: colors.ink },
+  choiceText: { fontFamily: fonts.serifSemibold, fontSize: 16, color: colors.ink },
   choiceTextOn: { color: colors.accentInk },
   spacer: { flex: 1 },
   start: { backgroundColor: colors.accent, paddingVertical: 17, borderRadius: radius.md, alignItems: "center", marginBottom: 48 },
-  startText: { fontFamily: fonts.serif, fontSize: 18, fontWeight: "700", color: colors.accentInk },
+  startText: { fontFamily: fonts.serifBold, fontSize: 18, color: colors.accentInk },
 });

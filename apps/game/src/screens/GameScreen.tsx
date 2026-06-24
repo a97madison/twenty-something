@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   barCell: { flex: 1, alignItems: "center" },
   barDivider: { width: 1, alignSelf: "stretch", backgroundColor: colors.line, marginVertical: 6 },
   barLabel: { fontFamily: fonts.sans, fontSize: 10, letterSpacing: 1.2, color: colors.inkFaint },
-  barValue: { fontFamily: fonts.serif, fontSize: 22, fontWeight: "700", color: colors.ink, marginTop: 1 },
+  barValue: { fontFamily: fonts.serifBold, fontSize: 22, color: colors.ink, marginTop: 1 },
   streakHot: { color: colors.accent },
   pad: { flex: 1, marginTop: 14 },
   curtain: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "flex-end", paddingBottom: 6 },

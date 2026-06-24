@@ -12,6 +12,7 @@
     "@twenty-something/core": "*"
   },
   "peerDependencies": {
+    "expo-font": "*",
     "expo-haptics": "*",
     "react": "*",
     "react-native": "*"

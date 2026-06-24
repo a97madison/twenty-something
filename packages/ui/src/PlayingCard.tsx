@@ -53,5 +53,5 @@ const styles = StyleSheet.create({
   wrap: { alignItems: "center", justifyContent: "center" },
   img: { width: "100%", height: "100%" },
   faded: { opacity: 0.4 },
-  fallback: { fontFamily: fonts.serif, fontSize: 28, fontWeight: "700", color: colors.ink },
+  fallback: { fontFamily: fonts.serifBold, fontSize: 28, color: colors.ink },
 });

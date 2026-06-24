@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: "center",
   },
-  primaryBtnText: { fontFamily: fonts.serif, fontSize: 16, fontWeight: "700", color: colors.accentInk },
+  primaryBtnText: { fontFamily: fonts.serifBold, fontSize: 16, color: colors.accentInk },
   ghostBtn: {
     marginTop: 9,
     borderColor: colors.line2,
@@ -108,6 +108,6 @@ const styles = StyleSheet.create({
   solText: { fontFamily: fonts.mono, fontSize: 16, color: colors.ink },
   verdict: { marginTop: 4, padding: 16, borderRadius: 11, alignItems: "center", borderWidth: 1 },
   verdictNo: { backgroundColor: colors.verdictNoBg, borderColor: colors.bad },
-  verdictBig: { fontFamily: fonts.serif, fontSize: 18, fontWeight: "700", marginBottom: 3 },
+  verdictBig: { fontFamily: fonts.serifBold, fontSize: 18, marginBottom: 3 },
   verdictSub: { fontFamily: fonts.mono, fontSize: 12 },
 });

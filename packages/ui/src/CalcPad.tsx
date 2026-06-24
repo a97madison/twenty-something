@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  exprBackspaceText: { fontFamily: fonts.mono, fontSize: 18, fontWeight: "500", color: colors.ink },
+  exprBackspaceText: { fontFamily: fonts.monoMedium, fontSize: 18, color: colors.ink },
   targetPill: {
     minWidth: 56,
     paddingHorizontal: 14,
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  targetPillText: { fontFamily: fonts.serif, fontSize: 24, fontWeight: "700", color: colors.accentInk },
+  targetPillText: { fontFamily: fonts.serifBold, fontSize: 24, color: colors.accentInk },
 
   // --- Calculator block -----------------------------------------------------
   block: { flexDirection: "row", alignItems: "stretch", gap: 10 },
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  acBtnText: { fontFamily: fonts.mono, fontSize: 16, fontWeight: "500", color: colors.ink },
+  acBtnText: { fontFamily: fonts.monoMedium, fontSize: 16, color: colors.ink },
   judgeBtn: {
     flex: 1,
     height: 52,
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  opKeyText: { fontFamily: fonts.serif, fontSize: 22, fontWeight: "600", color: colors.ink },
+  opKeyText: { fontFamily: fonts.serifSemibold, fontSize: 22, color: colors.ink },
   // The one accent key in the column, deliberately taller than the op keys.
   equals: {
     height: 88,
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   equalsDisabled: { opacity: 0.35 },
-  equalsText: { fontFamily: fonts.serif, fontSize: 32, fontWeight: "700", color: colors.accentInk },
+  equalsText: { fontFamily: fonts.serifBold, fontSize: 32, color: colors.accentInk },
 
   // --- Inline feedback ------------------------------------------------------
   feedback: { fontFamily: fonts.mono, fontSize: 13, textAlign: "center", marginTop: 14 },

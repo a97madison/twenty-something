@@ -59,6 +59,6 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     alignItems: "center",
   },
-  keyText: { fontFamily: fonts.mono, fontSize: 17, fontWeight: "500", color: colors.ink },
-  keyOp: { color: colors.accent, fontWeight: "600" },
+  keyText: { fontFamily: fonts.monoMedium, fontSize: 17, color: colors.ink },
+  keyOp: { color: colors.accent },
 });
