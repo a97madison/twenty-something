@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import type { Operation, Variant } from "@twenty-something/core";
 
 import { colors, fonts, radius } from "./theme/tokens";
+import { CARD_BACK } from "./cards";
+import { PlayingCard, CARD_ASPECT } from "./PlayingCard";
 
 /** Cosmetic suit glyph + ink colour. Index into this with a card's suit index. */
 export interface SuitData {
@@ -222,33 +224,22 @@ function CardCell({ value, suit, isTarget, used, index, dealNonce, onPress }: Ca
 
   const backRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] });
   const faceRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ["180deg", "360deg"] });
-  const inkColor = suit.red ? colors.cardRed : colors.cardBlack;
 
   return (
     <View style={styles.cardWrap}>
       {isTarget && <Text style={styles.targetMark}>TARGET CARD</Text>}
       <Pressable style={styles.cardAspect} onPress={onPress} disabled={used} accessibilityRole="button" accessibilityLabel={`Card ${index + 1}: ${pip(value)}${suit.s}`}>
         <Animated.View
-          style={[styles.cardFace, styles.cardBack, { transform: [{ perspective: 800 }, { rotateY: backRotate }] }]}
+          style={[styles.cardFace, { transform: [{ perspective: 800 }, { rotateY: backRotate }] }]}
           pointerEvents="none"
         >
-          <Text style={styles.cardBackMark}>✦</Text>
+          <Image source={CARD_BACK} style={styles.cardImg} resizeMode="contain" />
         </Animated.View>
         <Animated.View
-          style={[
-            styles.cardFace,
-            used && styles.cardUsed,
-            { transform: [{ perspective: 800 }, { rotateY: faceRotate }] },
-          ]}
+          style={[styles.cardFace, { transform: [{ perspective: 800 }, { rotateY: faceRotate }] }]}
           pointerEvents="none"
         >
-          <Text style={[styles.cornerTL, { color: inkColor }]}>
-            {pip(value)} {suit.s}
-          </Text>
-          <Text style={[styles.cardPip, { color: inkColor }]}>{pip(value)}</Text>
-          <Text style={[styles.cornerBR, { color: inkColor }]}>
-            {pip(value)} {suit.s}
-          </Text>
+          <PlayingCard value={value} suitGlyph={suit.s} faded={used} style={styles.cardImg} />
         </Animated.View>
       </Pressable>
     </View>
@@ -299,38 +290,18 @@ const styles = StyleSheet.create({
     color: colors.accent,
     marginBottom: 2,
   },
-  cardAspect: { width: "100%", aspectRatio: 2.5 / 3.5 },
+  cardAspect: { width: "100%", aspectRatio: CARD_ASPECT },
   cardFace: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.cardFace,
-    borderRadius: radius.lg,
-    borderColor: colors.line,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     backfaceVisibility: "hidden",
   },
-  cardBack: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accentSoft,
-  },
-  cardBackMark: { fontFamily: fonts.serif, fontSize: 26, color: colors.accentSoft },
-  cardUsed: { opacity: 0.4 },
-  cardPip: { fontFamily: fonts.serif, fontSize: 40, fontWeight: "700" },
-  cornerTL: { position: "absolute", top: 6, left: 8, fontFamily: fonts.serif, fontSize: 13, fontWeight: "700" },
-  cornerBR: {
-    position: "absolute",
-    bottom: 6,
-    right: 8,
-    fontFamily: fonts.serif,
-    fontSize: 13,
-    fontWeight: "700",
-    transform: [{ rotate: "180deg" }],
-  },
+  cardImg: { width: "100%", height: "100%" },
 
   judgeRow: { flexDirection: "row", gap: 10, marginTop: 10 },
   judgeBtn: {

@@ -14,3 +14,5 @@ export { CardRow } from "./CardRow";
 export { Keypad } from "./Keypad";
 export { CalcPad } from "./CalcPad";
 export type { SuitData, Paren, CalcPadFeedback } from "./CalcPad";
+export { PlayingCard, CARD_ASPECT } from "./PlayingCard";
+export { cardImage, CARD_BACK } from "./cards";
