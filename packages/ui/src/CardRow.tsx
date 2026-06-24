@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, Pressable } from "react-native";
 import type { Variant } from "@twenty-something/core";
-import { colors, fonts, radius } from "./theme/tokens";
+import { colors, fonts } from "./theme/tokens";
+import { PlayingCard, CARD_ASPECT } from "./PlayingCard";
 
 type SuitData = { s: string; red: boolean };
 
@@ -29,28 +30,17 @@ export function CardRow({ values, suits, suitData, variant, mode, usedIndices, o
         const suit = suitData[suits[i]!]!;
         const isFourth = variant === "20_something" && i === 3;
         const used = mode === "checker" && usedIndices.includes(i);
-        const inkColor = suit.red ? colors.cardRed : colors.cardBlack;
         return (
           <View key={i} style={styles.cardWrap}>
             {isFourth && <Text style={styles.fourthMark}>TARGET CARD</Text>}
             <Pressable
               onPress={() => onCardPress(i)}
               disabled={used}
-              style={[
-                styles.card,
-                isFourth && styles.cardFourth,
-                used && styles.cardUsed,
-              ]}
+              style={styles.card}
               accessibilityRole="button"
               accessibilityLabel={`Card ${i + 1}: ${pip(v)}${suit.s}`}
             >
-              <Text style={[styles.cornerTL, { color: inkColor }]}>
-                {pip(v)} {suit.s}
-              </Text>
-              <Text style={[styles.pip, { color: inkColor }]}>{pip(v)}</Text>
-              <Text style={[styles.cornerBR, { color: inkColor }]}>
-                {pip(v)} {suit.s}
-              </Text>
+              <PlayingCard value={v} suitGlyph={suit.s} faded={used} style={styles.cardImg} />
             </Pressable>
             <Text style={styles.idx}>card {i + 1}</Text>
           </View>
@@ -74,26 +64,8 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    aspectRatio: 2.5 / 3.5,
-    backgroundColor: colors.cardFace,
-    borderRadius: radius.md,
-    borderColor: colors.line,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    aspectRatio: CARD_ASPECT,
   },
-  cardFourth: { borderColor: colors.accentSoft },
-  cardUsed: { opacity: 0.4 },
-  pip: { fontFamily: fonts.serif, fontSize: 28, fontWeight: "700" },
-  cornerTL: { position: "absolute", top: 5, left: 7, fontFamily: fonts.serif, fontSize: 12, fontWeight: "700" },
-  cornerBR: {
-    position: "absolute",
-    bottom: 5,
-    right: 7,
-    fontFamily: fonts.serif,
-    fontSize: 12,
-    fontWeight: "700",
-    transform: [{ rotate: "180deg" }],
-  },
+  cardImg: { width: "100%", height: "100%" },
   idx: { fontFamily: fonts.sans, fontSize: 10, color: colors.inkFaint, marginTop: 4 },
 });
