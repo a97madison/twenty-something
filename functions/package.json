@@ -12,15 +12,16 @@
     "pretest": "npm run build -w @twenty-something/core",
     "test": "node --test --experimental-strip-types src/logic.test.ts src/daily.test.ts",
     "typecheck": "tsc --noEmit",
-    "build:deploy": "npm run build -w @twenty-something/core && tsc -p tsconfig.build.json"
+    "build:deploy": "npm run build -w @twenty-something/core && esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --external:firebase-admin --external:firebase-admin/* --external:firebase-functions --external:firebase-functions/* --outfile=lib/index.js"
   },
   "dependencies": {
-    "@twenty-something/core": "*",
     "firebase-admin": "^13.10.0",
     "firebase-functions": "^6.6.0"
   },
   "devDependencies": {
+    "@twenty-something/core": "*",
     "@types/node": "^22.0.0",
+    "esbuild": "^0.28.1",
     "typescript": "^5.7.0"
   }
 }

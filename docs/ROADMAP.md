@@ -46,17 +46,27 @@ The **logic already exists** in `functions/` (`submitDaily`, `computePercentile`
 - **Score:** reuse the client star model (accuracy + speed) as the composite so the percentile matches what the player sees.
 - **Client:** Summary's "percentile coming with the online update" placeholder swaps for the real value behind a `BACKEND_ENABLED` flag; offline or pre-deploy, it degrades to the local rating with no dead UI.
 
-**To unblock (your action):** `firebase login`, create the project, `firebase init` (functions + firestore + emulator), add `firebase-admin`/`firebase-functions` to `functions/package.json`, write `firestore.rules` (deny direct writes; all scoring via the callable), deploy. Then run the emulator integration test for the **first-solver/percentile** path before shipping. This was already the repo's known blocker.
+**De-risked (done):** the scaffolding already exists (`firebase.json`, `.firebaserc`, default-deny `firestore.rules`, `functions/package.json` with `firebase-admin`/`firebase-functions`), and the **monorepo deploy trap is fixed**: `build:deploy` now esbuild-bundles `@twenty-something/core` *inline* into a self-contained `lib/index.js` (firebase SDKs stay external for the cloud install; core moved to a build-only dep). Verified: 0 workspace imports remain in the bundle, it's valid ESM, functions still typecheck + pass 25 tests. So a cloud `npm install` can't choke on the unpublishable workspace package — the thing that would have silently broken every deploy.
+
+**Still yours (account-gated):** `firebase login`, create the `twenty-something-dev` project, **enable Blaze billing** (2nd-gen functions require it), then `firebase deploy --only firestore:rules,functions`.
+
+**Blocked locally:** the emulator integration test (`submitDaily` → percentile) needs the **Firestore emulator, which requires a JDK** that isn't installed on this machine. Install a JDK (e.g. Temurin 17) and `firebase emulators:start` to run it — the test asserts the first-solver/percentile path before you ship.
 
 ## 4. Notifications — BLOCKED on a dev build (logic ready)
 
 > daily reset → notify; weekly rating reset → notify.
 
-**Decision: local scheduled notifications, not push.** Both triggers are *time-based and identical for the device* (its local midnight; the UTC weekly instant) — so they need no server, no push tokens, no APNs/FCM cost, and work offline. (Push is only worth it later for social pokes: "someone beat your daily time.")
+**Decision: local scheduled notifications, not push.** The retention triggers are *time-based and identical for the device* — no server, no push tokens, no APNs/FCM cost, works offline. (Push is only worth it later for social/competitive pokes that depend on the whole field.)
 
-- **Daily:** `expo-notifications` calendar trigger, `{ hour: 0, minute: 0, repeats: true }` → fires at local midnight: *"New daily challenge is live 🃏"*.
-- **Weekly:** schedule a one-shot at `now + msUntilWeeklyReset(now)` (already computed/tested), reschedule on each launch: *"Weekly ratings just reset — climb back up ⭐"*.
-- Permission asked **after first daily completion** (ask when the value is obvious, not on a cold first launch). Re-arm both on every app start so they never drift.
+Best-practice principle (Wordle/NYT/2048): **fewer, smarter, personalized** beats frequent. Over-notifying gets you muted or uninstalled and OS-throttled. The slate, in priority order:
+
+1. **Streak-at-risk** — *the* lever (pure loss-aversion; daily-game players guard streaks obsessively). Fire only if you have an active streak and haven't played today, a few hours before *your* local midnight: *"🔥 Your 12-day streak ends in 3 hours."* Personalize the number — that's what makes it land.
+2. **Daily nudge at a good hour, NOT at the reset.** Don't fire at local midnight (nobody's awake, it's annoying) — fire mid-morning / early-evening (default ~9am; ideally learn the player's habitual play time), only if unplayed: *"Today's hand is dealt ☕."*
+3. **Win-back, capped.** At 3 days and 7 days away, then **stop** (endless reminders cause the uninstall you're avoiding).
+4. **Weekly recap on reset** — personalized, not generic: *"Your week: 23 hands, ★3.8 avg — your best yet."* Reschedule a one-shot at `now + msUntilWeeklyReset(now)` (already computed/tested) each launch.
+5. **Streak milestone (positive):** "🎉 7-day streak!" on 7/30/100.
+
+Implementation: `expo-notifications`; calendar trigger for the daily nudge, date trigger for the weekly recap, re-armed every launch so they never drift. Permission asked **after the first win/streak** (when value is obvious), with a per-category settings toggle, quiet hours, and deep-links straight to the daily. The scheduling math (`msUntilWeeklyReset`, `msUntilLocalMidnight`) is already pure + tested; wiring the service is ~30 lines.
 
 **Why not shipped here:** `expo-notifications` needs native config + a development build to verify *delivery* (Expo Go can't reliably fire scheduled local notifications since SDK 53), and I won't add an unverifiable native dep to the frozen SDK-56 graph blind. The scheduling math it depends on (`msUntilWeeklyReset`, `msUntilLocalMidnight`) is already pure and tested — wiring the `expo-notifications` service is then ~30 lines.
 
@@ -75,8 +85,8 @@ The **logic already exists** in `functions/` (`submitDaily`, `computePercentile`
 The core loop is genuinely good: **variable reward** (a hand might be unsolvable, so every hand is a real judgment call, not a guaranteed win) + **speed pressure** (the live timer) + **streak** + **star rating**. Recently added beats: the reveal "curtain", the in-game streak, the daily/weekly countdowns.
 
 Highest-ROI next additions, in order:
-1. **Share button** on the daily (built in core — just wire it). Growth + pride.
-2. **Daily percentile** (§3) — turns a solo result into a competitive one.
+1. ~~**Share button** on the daily~~ — ✅ shipped (outcome-only, core `buildDailyShareText`).
+2. **Daily percentile** (§3) — turns a solo result into a competitive one; backend code + deploy bundling done, needs the Firebase login/billing.
 3. **Streak freeze / "perfect week"** badges — loss-aversion keeps the streak alive.
 4. **Win flourish** on a fast 5-star solve (confetti/sound) — the dopamine spike the quiet loop is missing.
 5. **First-solve haptic + count-up** on the rating delta in Summary.
@@ -90,7 +100,9 @@ Highest-ROI next additions, in order:
 | Daily deterministic deck (same for all) | ✅ shipped, tested |
 | Records as its own Stats section | ✅ shipped |
 | Fractional star fill | ✅ shipped |
-| Daily percentile | ⛔ needs Firebase deploy (logic done) |
+| **Daily share button (outcome-only)** | ✅ shipped, tested |
+| **Functions deploy bundling (monorepo trap)** | ✅ fixed, verified |
+| Daily percentile | ⛔ needs Firebase login + Blaze + deploy (code + bundling done) |
+| Percentile emulator test | ⛔ needs a JDK installed locally |
 | Notifications (daily + weekly) | ⛔ needs dev build (scheduling math done) |
-| Share button | ⏳ core builder done, UI not wired |
 | Store distribution | ⏳ needs EAS + store accounts |
