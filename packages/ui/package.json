@@ -1,0 +1,23 @@
+{
+  "name": "@twenty-something/ui",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "description": "Shared input UI (card row, operator keypad), the tap-token parser, and the paper/felt theme tokens for the 20-Something apps. Consumed as source by Metro (not built to dist).",
+  "scripts": {
+    "test": "node --test --experimental-strip-types src/parser.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@twenty-something/core": "*"
+  },
+  "peerDependencies": {
+    "expo-haptics": "*",
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "^5.7.0"
+  }
+}

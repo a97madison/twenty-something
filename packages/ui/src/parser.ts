@@ -1,6 +1,22 @@
 import type { Expr, Operation } from "@twenty-something/core";
 
-import type { CheckerToken } from "../App";
+/**
+ * A card tapped into the expression, identified by its hand index (0–3).
+ * The leaf value is filled later from the real card values (see fillValues).
+ */
+export type CardToken = { type: "card"; i: number };
+
+/**
+ * One tap-event in the checker's expression builder: a card, an operator, or a
+ * parenthesis. The UI emits a CheckerToken[] as the player taps; parseTokens
+ * turns it into a core Expr. This is a CLIENT INPUT concern (not a game rule),
+ * which is why it lives here in the shared UI package rather than in core.
+ */
+export type CheckerToken =
+  | CardToken
+  | { type: "op"; op: Operation }
+  | { type: "lp" }
+  | { type: "rp" };
 
 /**
  * Shunting-yard parser: tokens → Expr tree, or null if malformed/incomplete.

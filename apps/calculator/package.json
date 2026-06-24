@@ -9,12 +9,12 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --test --experimental-strip-types src/screens/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.15",
     "@twenty-something/core": "*",
+    "@twenty-something/ui": "*",
     "expo": "^56.0.12",
     "expo-haptics": "~56.0.3",
     "expo-status-bar": "~56.0.4",

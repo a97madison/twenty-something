@@ -1,5 +1,5 @@
 import { Modal, StyleSheet, Text, View, Pressable } from "react-native";
-import { colors, fonts, radius } from "../theme/tokens";
+import { colors, fonts, radius } from "@twenty-something/ui";
 
 interface Props {
   /** The card being edited (0–3), or null when the picker is closed. */

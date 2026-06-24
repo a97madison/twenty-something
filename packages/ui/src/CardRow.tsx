@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, Pressable } from "react-native";
 import type { Variant } from "@twenty-something/core";
-import { colors, fonts, radius } from "../theme/tokens";
+import { colors, fonts, radius } from "./theme/tokens";
 
 type SuitData = { s: string; red: boolean };
 

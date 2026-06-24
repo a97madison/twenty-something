@@ -6,12 +6,11 @@ import {
   formatExpr,
   CLASSIC_OPERATIONS,
   type Hand,
-  type Operation,
 } from "@twenty-something/core";
 
-import { colors, fonts, radius, space } from "../theme/tokens";
-import type { CheckerToken, CardToken, Verdict } from "../App";
-import { parseTokens, fillValues } from "./checkerParser";
+import { colors, fonts, radius, space, Keypad, parseTokens, fillValues } from "@twenty-something/ui";
+import type { CheckerToken, CardToken } from "@twenty-something/ui";
+import type { Verdict } from "../App";
 
 interface Props {
   values: number[];
@@ -43,21 +42,10 @@ function tokenStr(tokens: CheckerToken[], values: number[]): string {
     .join("");
 }
 
-const OPS: Operation[] = ["+", "-", "×", "÷"];
-
 export function CheckerPane({ values, hand, target, tokens, setTokens, verdict, setVerdict, onChecked }: Props) {
   const edit = (next: CheckerToken[]) => {
     setTokens(next);
     setVerdict(null); // editing invalidates any prior verdict
-  };
-
-  const push = (t: CheckerToken) => {
-    Haptics.selectionAsync();
-    edit([...tokens, t]);
-  };
-  const backspace = () => {
-    Haptics.selectionAsync();
-    edit(tokens.slice(0, -1));
   };
 
   const allFourUsed =
@@ -108,22 +96,10 @@ export function CheckerPane({ values, hand, target, tokens, setTokens, verdict, 
       </View>
 
       <Text style={styles.label}>Operators</Text>
-      <View style={styles.keypad}>
-        {OPS.map((op) => (
-          <Pressable key={op} style={styles.key} onPress={() => push({ type: "op", op })}>
-            <Text style={[styles.keyText, styles.keyOp]}>{op}</Text>
-          </Pressable>
-        ))}
-        <Pressable style={styles.key} onPress={() => push({ type: "lp" })}>
-          <Text style={styles.keyText}>(</Text>
-        </Pressable>
-        <Pressable style={styles.key} onPress={() => push({ type: "rp" })}>
-          <Text style={styles.keyText}>)</Text>
-        </Pressable>
-        <Pressable style={styles.key} onPress={backspace} accessibilityLabel="Backspace">
-          <Text style={styles.keyText}>⌫</Text>
-        </Pressable>
-      </View>
+      <Keypad
+        onPush={(t) => edit([...tokens, t])}
+        onBackspace={() => edit(tokens.slice(0, -1))}
+      />
 
       <Pressable
         style={[styles.primaryBtn, !canCheck && styles.primaryBtnDisabled]}
@@ -174,18 +150,6 @@ const styles = StyleSheet.create({
   },
   placeholder: { fontFamily: fonts.sans, fontSize: 14, color: colors.inkFaint },
   exprText: { fontFamily: fonts.mono, fontSize: 20, color: colors.ink, letterSpacing: 1 },
-  keypad: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 14 },
-  key: {
-    width: "18%",
-    backgroundColor: colors.panel,
-    borderColor: colors.line,
-    borderWidth: 1,
-    borderRadius: 9,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  keyText: { fontFamily: fonts.mono, fontSize: 17, fontWeight: "500", color: colors.ink },
-  keyOp: { color: colors.accent, fontWeight: "600" },
   primaryBtn: { backgroundColor: colors.accent, borderRadius: 11, paddingVertical: 15, alignItems: "center" },
   primaryBtnDisabled: { opacity: 0.35 },
   primaryBtnText: { fontFamily: fonts.serif, fontSize: 16, fontWeight: "700", color: colors.accentInk },

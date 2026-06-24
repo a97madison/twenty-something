@@ -1,7 +1,8 @@
 /**
  * Design tokens — the paper + green-felt identity, ported from the prototype.
  * Single source of visual truth for every component. Mirrors the CSS variables
- * the HTML prototype used, so the app and that spec stay aligned.
+ * the HTML prototype used, so the apps and that spec stay aligned. Shared by the
+ * calculator and the game via @twenty-something/ui.
  */
 
 export const colors = {

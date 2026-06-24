@@ -8,8 +8,7 @@ import {
   type Hand,
 } from "@twenty-something/core";
 
-import { parseTokens, fillValues } from "./checkerParser.ts";
-import type { CheckerToken } from "../App";
+import { parseTokens, fillValues, type CheckerToken } from "./parser.ts";
 
 // ---- token builders ------------------------------------------------------
 // The checker UI emits CheckerToken[] as the user taps. These mirror that.

@@ -9,9 +9,9 @@ import {
   type Card as CardModel,
 } from "@twenty-something/core";
 
-import { colors, fonts } from "./theme/tokens";
+import { colors, fonts, CardRow } from "@twenty-something/ui";
+import type { CheckerToken, CardToken } from "@twenty-something/ui";
 import { randomHand } from "./hand";
-import { CardRow } from "./components/CardRow";
 import { ValuePicker } from "./components/ValuePicker";
 import { SolverPane } from "./screens/SolverPane";
 import { CheckerPane } from "./screens/CheckerPane";
@@ -217,13 +217,8 @@ function VariantButton({
   );
 }
 
-// Shared token/verdict types used across the checker components.
-export type CardToken = { type: "card"; i: number };
-export type CheckerToken =
-  | CardToken
-  | { type: "op"; op: "+" | "-" | "×" | "÷" }
-  | { type: "lp" }
-  | { type: "rp" };
+// Checker verdict shown after a check. The token types it works with
+// (CheckerToken/CardToken) live in @twenty-something/ui alongside the parser.
 export type Verdict = { ok: boolean; big: string; sub: string };
 
 const styles = StyleSheet.create({

@@ -10,7 +10,7 @@ import {
   type Solution,
 } from "@twenty-something/core";
 
-import { colors, fonts, radius, space } from "../theme/tokens";
+import { colors, fonts, radius, space } from "@twenty-something/ui";
 import { randomHand } from "../hand";
 
 interface Props {
