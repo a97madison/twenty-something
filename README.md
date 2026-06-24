@@ -26,15 +26,6 @@ apps/calculator      @twenty-something/calculator — Expo / React Native app.
                      core; contains no game logic of its own.
 ```
 
-## What exists vs. planned
-
-Built and tested: the core engine, the scoring Cloud Functions, and the
-calculator app.
-
-Designed but not yet built: the daily-puzzle generator, online multiplayer
-rooms, the game app itself, and a web build. Data models for these exist in the
-functions package; the implementations do not yet.
-
 ## Develop
 
 ```bash
