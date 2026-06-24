@@ -1,33 +1,37 @@
 /**
  * Offline game engine — pure, UI-free, fully node-testable.
  *
- * Everything the single-player game needs that ISN'T rendering: dealing a
- * guaranteed-solvable hand, speed-based scoring, the streak rules, and
- * local-record persistence. No React, no React Native, no Date.now / Math.random
- * inside the transitions — `now` and `rng` are injected, so every function is
- * deterministic and unit-testable the way core/functions are.
+ * The "judge the hand" model: hands are dealt at NATURAL distribution (some are
+ * genuinely unsolvable) and the player must JUDGE each one — solve it, declare
+ * "no solution", or pass (give up). There is no points score. The metrics are
+ * accuracy, solve time, and a composite star rating, tracked PER VARIANT.
  *
- * This is deliberately ONE module with no relative imports (only the core
- * package). In step 3 Metro bundles this source, and Metro rejects `.ts` import
- * extensions while node's test runner requires them — keeping the engine
- * self-contained avoids that conflict (tests import `./engine.ts`; the screens
- * reach it through an extensionless barrel).
+ * Everything here is deterministic: `now`, `rng`, and the local `dayKey` are
+ * injected, never read from the environment, so every transition is unit-testable
+ * the way core/functions are. Correctness is judged by core's `validateSolution`
+ * (the same cheat-proof authority the server uses); revealed answers come from
+ * core's `findFirstSolution`.
  *
- * Correctness is NOT re-implemented here: a submitted solution is judged by
- * core's `validateSolution`, the same cheat-proof authority the server uses, so
- * the streak only advances on a genuinely correct answer.
+ * This is deliberately ONE module importing only the core package. Metro bundles
+ * this source and rejects `.ts` import extensions, while node's test runner
+ * requires them — keeping the engine self-contained avoids that conflict (tests
+ * import `./engine.ts`; the screens reach it through an extensionless barrel).
  */
 
 import {
   validateSolution,
   computeTarget,
   isSolvable,
+  findFirstSolution,
+  formatExpr,
   CLASSIC_OPERATIONS,
   type Expr,
   type Hand,
   type Variant,
   type ValidationError,
 } from "@twenty-something/core";
+
+export const VARIANTS: readonly Variant[] = ["24", "20_something"];
 
 // ---------------------------------------------------------------------------
 // Dealing
@@ -36,7 +40,7 @@ import {
 /** A source of randomness in [0, 1). Injected so deals are deterministic in tests. */
 export type Rng = () => number;
 
-/** A dealt hand: cosmetic values/suits plus the typed core hand and its target. */
+/** A dealt hand: cosmetic values/suits, the typed core hand, target, and truth. */
 export interface DealtHand {
   /** Four card values, A–K = 1–13, in flip order (index 3 = last-flipped). */
   values: number[];
@@ -46,12 +50,13 @@ export interface DealtHand {
   hand: Hand;
   /** The number to reach, computed for the variant. */
   target: number;
+  /** Ground truth: does a solution exist? The player must judge this. */
+  solvable: boolean;
 }
 
 const CARD_COUNT = 4;
 const VALUE_RANGE = 13; // A..K
 const SUIT_RANGE = 4;
-const MAX_DEAL_ATTEMPTS = 1000;
 
 function buildHand(values: number[]): Hand {
   return [
@@ -63,187 +68,480 @@ function buildHand(values: number[]): Hand {
 }
 
 /**
- * Deal a hand GUARANTEED solvable for the variant. Re-rolls until core's solver
- * confirms a solution exists, so the game never deals a dead hand. Solvable
- * hands are overwhelmingly common, so this almost always succeeds on the first
- * try; the attempt cap is a safety valve against a pathological rng.
+ * Deal ONE hand at natural distribution — no re-rolling. The hand may be
+ * unsolvable; its `solvable` flag carries the ground truth from core's solver,
+ * which is what the player is being asked to judge.
  */
-export function dealSolvableHand(variant: Variant, rng: Rng = Math.random): DealtHand {
-  for (let attempt = 0; attempt < MAX_DEAL_ATTEMPTS; attempt++) {
-    const values = Array.from({ length: CARD_COUNT }, () => 1 + Math.floor(rng() * VALUE_RANGE));
-    const suits = Array.from({ length: CARD_COUNT }, () => Math.floor(rng() * SUIT_RANGE));
-    const hand = buildHand(values);
-    const target = computeTarget(variant, hand);
-    if (isSolvable({ hand, target, operations: CLASSIC_OPERATIONS })) {
-      return { values, suits, hand, target };
-    }
+export function dealHand(variant: Variant, rng: Rng = Math.random): DealtHand {
+  const values = Array.from({ length: CARD_COUNT }, () => 1 + Math.floor(rng() * VALUE_RANGE));
+  const suits = Array.from({ length: CARD_COUNT }, () => Math.floor(rng() * SUIT_RANGE));
+  const hand = buildHand(values);
+  const target = computeTarget(variant, hand);
+  const solvable = isSolvable({ hand, target, operations: CLASSIC_OPERATIONS });
+  return { values, suits, hand, target, solvable };
+}
+
+/** Deal `n` natural-distribution hands. */
+export function dealHands(variant: Variant, n: number, rng: Rng = Math.random): DealtHand[] {
+  return Array.from({ length: n }, () => dealHand(variant, rng));
+}
+
+// --- Deterministic daily deal -------------------------------------------------
+
+/** Deterministic PRNG (mulberry32) — same seed ⇒ same stream. */
+function mulberry32(seed: number): Rng {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** FNV-1a hash of a string → uint32 seed. */
+function hashSeed(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
   }
-  throw new Error(`dealSolvableHand: no solvable hand in ${MAX_DEAL_ATTEMPTS} attempts`);
+  return h >>> 0;
+}
+
+/** Number of hands in a daily challenge (variable — tune here). */
+export const DAILY_HANDS = 5;
+
+/**
+ * The shared daily challenge: everyone who plays `dateKey` + `variant` gets the
+ * SAME `n` hands, generated from a date seed. Fully offline and deterministic —
+ * no backend needed for the hands themselves (only the percentile is server-side).
+ */
+export function dealDailyHands(
+  variant: Variant,
+  dateKey: string,
+  n: number = DAILY_HANDS,
+): DealtHand[] {
+  const rng = mulberry32(hashSeed(`${dateKey}|${variant}`));
+  return Array.from({ length: n }, () => dealHand(variant, rng));
 }
 
 // ---------------------------------------------------------------------------
-// Scoring (scaled by speed; never a fail condition)
+// Star rating (composite of accuracy + speed)
 // ---------------------------------------------------------------------------
 
-/** Points for an instant solve. */
-export const BASE_SCORE = 1000;
-/** Points shed per second of solving. */
-export const PENALTY_PER_SEC = 10;
-/** A solve never scores below this — a slow solve still counts, it just earns less. */
-export const MIN_SCORE = 100;
+/** Solve at or under this (ms) earns the full speed bonus. */
+export const FAST_MS = 5_000;
+/** Solve at or over this (ms) earns no speed bonus (still correct). */
+export const SLOW_MS = 60_000;
+/** A correct hand is worth at least this many stars (the "you got it right" half). */
+export const CORRECT_BASE_STARS = 2.5;
+/** Maximum stars for a single hand. */
+export const MAX_STARS = 5;
 
 /**
- * Score for a single solve, scaled by speed. Linear decay from BASE_SCORE down
- * to a MIN_SCORE floor: the timer lowers your score but, by design, can never
- * zero it out or break a streak. Negative elapsed (clock skew) is clamped to 0.
+ * Star score for a CORRECT hand, in [CORRECT_BASE_STARS, MAX_STARS]: half the
+ * stars for being right, up to half more for being fast. Wrong/passed hands
+ * score 0 — that is applied by the caller, not here.
  */
-export function solveScore(elapsedMs: number): number {
-  const seconds = Math.max(0, elapsedMs) / 1000;
-  const raw = Math.round(BASE_SCORE - PENALTY_PER_SEC * seconds);
-  return Math.max(MIN_SCORE, Math.min(BASE_SCORE, raw));
+export function starScore(elapsedMs: number): number {
+  const t = Math.max(0, elapsedMs);
+  const speedFrac = 1 - clamp01((t - FAST_MS) / (SLOW_MS - FAST_MS));
+  return CORRECT_BASE_STARS + (MAX_STARS - CORRECT_BASE_STARS) * speedFrac;
+}
+
+function clamp01(x: number): number {
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
+// ---------------------------------------------------------------------------
+// Per-variant statistics (per-day buckets → all-time + rolling-7-day rollups)
+// ---------------------------------------------------------------------------
+
+/** One day's tally for one variant. `dayKey` is the local "YYYY-MM-DD". */
+export interface DayBucket {
+  /** Committed decisions that day. */
+  count: number;
+  /** Of those, how many were correct. */
+  correctCount: number;
+  /** Sum of solve times (ms) over CORRECT decisions only (for avg time). */
+  timeSumCorrect: number;
+  /** Sum of star scores over ALL decisions (for rating). */
+  starSum: number;
+}
+
+/** All stored stats for one variant. */
+export interface VariantStats {
+  /** dayKey → bucket. all-time = aggregate all; weekly = aggregate last 7 days. */
+  days: Record<string, DayBucket>;
+  /** Longest streak ever reached for this variant. */
+  bestStreak: number;
+  /** Fastest single correct solve (ms), or null until the first correct solve. */
+  bestTimeMs: number | null;
+}
+
+/** Stats for every variant. */
+export type AllStats = Record<Variant, VariantStats>;
+
+function emptyVariantStats(): VariantStats {
+  return { days: {}, bestStreak: 0, bestTimeMs: null };
+}
+
+export function emptyStats(): AllStats {
+  return { "24": emptyVariantStats(), "20_something": emptyVariantStats() };
+}
+
+/** A rolled-up view over some set of day buckets. */
+export interface Rollup {
+  /** Decisions in the window. */
+  count: number;
+  /** Correct decisions in the window. */
+  correctCount: number;
+  /** correctCount / count, or null when count === 0. */
+  accuracy: number | null;
+  /** Mean solve time (ms) over correct decisions, or null when none correct. */
+  avgTimeMs: number | null;
+  /** Mean star score over all decisions, or null when count === 0. */
+  rating: number | null;
+}
+
+function rollup(buckets: DayBucket[]): Rollup {
+  let count = 0;
+  let correctCount = 0;
+  let timeSumCorrect = 0;
+  let starSum = 0;
+  for (const b of buckets) {
+    count += b.count;
+    correctCount += b.correctCount;
+    timeSumCorrect += b.timeSumCorrect;
+    starSum += b.starSum;
+  }
+  return {
+    count,
+    correctCount,
+    accuracy: count === 0 ? null : correctCount / count,
+    avgTimeMs: correctCount === 0 ? null : timeSumCorrect / correctCount,
+    rating: count === 0 ? null : starSum / count,
+  };
+}
+
+/** All-time rollup for a variant (every day bucket). */
+export function allTimeRollup(vs: VariantStats): Rollup {
+  return rollup(Object.values(vs.days));
+}
+
+/**
+ * Rolling-7-day rollup for a variant: buckets whose dayKey falls within the 7
+ * days ending at `todayKey` (today and the 6 prior days). Pure — the SCREEN
+ * passes today's local dayKey.
+ */
+export function weeklyRollup(vs: VariantStats, todayKey: string): Rollup {
+  const today = epochDayFromKey(todayKey);
+  const from = today - 6;
+  const inWindow = Object.entries(vs.days)
+    .filter(([key]) => {
+      const e = epochDayFromKey(key);
+      return e >= from && e <= today;
+    })
+    .map(([, b]) => b);
+  return rollup(inWindow);
+}
+
+/**
+ * Days since the Unix epoch for a "YYYY-MM-DD" key (Howard Hinnant's
+ * days_from_civil). Pure integer math — no Date, so it is deterministic and
+ * timezone-free; the SCREEN is responsible for producing a local-time dayKey.
+ */
+export function epochDayFromKey(key: string): number {
+  const [ys, ms, ds] = key.split("-");
+  const y0 = Number(ys);
+  const m = Number(ms);
+  const d = Number(ds);
+  const y = y0 - (m <= 2 ? 1 : 0);
+  const era = Math.floor((y >= 0 ? y : y - 399) / 400);
+  const yoe = y - era * 400;
+  const doy = Math.floor((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  return era * 146097 + doe - 719468;
+}
+
+/** Record one committed decision into a variant's stats (returns a new AllStats). */
+function recordDecision(
+  stats: AllStats,
+  variant: Variant,
+  dayKey: string,
+  decision: { correct: boolean; elapsedMs: number; star: number },
+  streakAfter: number,
+): AllStats {
+  const vs = stats[variant];
+  const prev = vs.days[dayKey] ?? { count: 0, correctCount: 0, timeSumCorrect: 0, starSum: 0 };
+  const day: DayBucket = {
+    count: prev.count + 1,
+    correctCount: prev.correctCount + (decision.correct ? 1 : 0),
+    timeSumCorrect: prev.timeSumCorrect + (decision.correct ? decision.elapsedMs : 0),
+    starSum: prev.starSum + decision.star,
+  };
+  const bestTimeMs = decision.correct
+    ? vs.bestTimeMs === null
+      ? decision.elapsedMs
+      : Math.min(vs.bestTimeMs, decision.elapsedMs)
+    : vs.bestTimeMs;
+  const nextVs: VariantStats = {
+    days: { ...vs.days, [dayKey]: day },
+    bestStreak: Math.max(vs.bestStreak, streakAfter),
+    bestTimeMs,
+  };
+  return { ...stats, [variant]: nextVs };
 }
 
 // ---------------------------------------------------------------------------
 // Game state + transitions
 // ---------------------------------------------------------------------------
 
-/** Persisted personal bests. Survive across runs via the KeyValueStore. */
-export interface Records {
-  /** Longest streak ever reached. */
-  bestStreak: number;
-  /** Fastest single solve in ms, or null until the first solve. */
-  bestTimeMs: number | null;
+/** Tally for the CURRENT run (drives the end-of-game summary). */
+export interface SessionTally {
+  /** Committed decisions this run. */
+  total: number;
+  /** Correct decisions this run. */
+  correct: number;
+  /** Sum of solve times (ms) over correct decisions this run. */
+  timeSumCorrect: number;
+  /** Sum of star scores over all decisions this run. */
+  starSum: number;
 }
 
-export const EMPTY_RECORDS: Records = { bestStreak: 0, bestTimeMs: null };
+const EMPTY_TALLY: SessionTally = { total: 0, correct: 0, timeSumCorrect: 0, starSum: 0 };
+
+/** What to show the player after a wrong "no solution" or a pass (give up). */
+export interface Reveal {
+  /** A worked solution string, or null when the hand genuinely had none. */
+  solution: string | null;
+}
 
 /** The whole offline game state. Plain data — no methods, no UI. */
 export interface GameState {
   variant: Variant;
-  /** The hand currently being solved. */
-  current: DealtHand;
-  /** Timestamp (ms) the current hand was dealt — scoring measures from here. */
+  /** The pre-dealt deck for this bounded session (length = handsTotal). */
+  hands: DealtHand[];
+  /** Index of the current hand == hands played so far. */
+  index: number;
+  /** Timestamp (ms) the current hand was dealt — solve time measures from here. */
   handStartedAt: number;
-  /** Consecutive solves without a pass. */
+  /** Consecutive correct decisions. */
   streak: number;
-  /** Running total this run. */
-  score: number;
-  /** Personal bests (loaded from storage, updated on solve). */
-  records: Records;
+  /** This run's tally. */
+  session: SessionTally;
+  /** Persisted per-variant stats (loaded on mount, updated each decision). */
+  stats: AllStats;
+  /** Reveal from the most recent decision, or null. Cleared when the hand advances. */
+  reveal: Reveal | null;
+  /** True once every hand in the session has been decided. */
+  done: boolean;
 }
 
-/** Start a fresh run: deal the first solvable hand, zero the streak and score. */
+/** The current hand, or undefined once the session is done. */
+export function currentHand(state: GameState): DealtHand | undefined {
+  return state.hands[state.index];
+}
+
+/** Total hands in this session. */
+export function handsTotal(state: GameState): number {
+  return state.hands.length;
+}
+
+/**
+ * Start a fresh bounded run over a pre-dealt deck of hands. Build the deck with
+ * `dealHands` (normal play) or `dealDailyHands` (the daily challenge), then pass
+ * it here. Zeroes the streak and session tally.
+ */
 export function newGame(
   variant: Variant,
-  opts: { now: number; rng?: Rng; records?: Records },
+  hands: DealtHand[],
+  opts: { now: number; stats?: AllStats },
 ): GameState {
   return {
     variant,
-    current: dealSolvableHand(variant, opts.rng),
+    hands,
+    index: 0,
     handStartedAt: opts.now,
     streak: 0,
-    score: 0,
-    records: opts.records ?? EMPTY_RECORDS,
+    session: { ...EMPTY_TALLY },
+    stats: opts.stats ?? emptyStats(),
+    reveal: null,
+    done: hands.length === 0,
   };
 }
 
-/** The result of submitting an attempt. On a wrong answer, `state` is unchanged. */
+/** Apply a committed decision: fold into session tally + stats, advance the hand. */
+function commit(
+  state: GameState,
+  dayKey: string,
+  now: number,
+  decision: { correct: boolean; elapsedMs: number; star: number },
+  reveal: Reveal | null,
+): GameState {
+  const streak = decision.correct ? state.streak + 1 : 0;
+  const session: SessionTally = {
+    total: state.session.total + 1,
+    correct: state.session.correct + (decision.correct ? 1 : 0),
+    timeSumCorrect: state.session.timeSumCorrect + (decision.correct ? decision.elapsedMs : 0),
+    starSum: state.session.starSum + decision.star,
+  };
+  const stats = recordDecision(state.stats, state.variant, dayKey, decision, streak);
+  const index = state.index + 1;
+  return {
+    ...state,
+    index,
+    handStartedAt: now,
+    streak,
+    session,
+    stats,
+    reveal,
+    done: index >= state.hands.length,
+  };
+}
+
+/** The result of submitting an expression. On a wrong answer, `state` is unchanged. */
 export type SubmitOutcome =
-  | { solved: true; elapsedMs: number; gained: number; state: GameState }
+  | { solved: true; elapsedMs: number; stars: number; state: GameState }
   | { solved: false; error: ValidationError; state: GameState };
 
 /**
  * Submit an expression as a solution to the current hand. Judged by core's
- * validateSolution. On success: score by speed, bump the streak, update the
- * records, and deal the next solvable hand. On failure: nothing changes — a
- * wrong answer costs only time, it does not break the streak (only a pass does).
+ * validateSolution. A CORRECT answer is a committed decision: scored by speed,
+ * streak +1, stats updated, hand advances. A WRONG answer is NOT committed —
+ * nothing changes, the clock keeps running, the player tries again.
  */
 export function submitSolution(
   state: GameState,
   expr: Expr,
   now: number,
-  rng?: Rng,
+  dayKey: string,
 ): SubmitOutcome {
+  const hand = currentHand(state);
+  if (!hand) return { solved: false, error: "wrong_cards", state };
   const result = validateSolution(expr, {
-    hand: state.current.hand,
-    target: state.current.target,
+    hand: hand.hand,
+    target: hand.target,
     operations: CLASSIC_OPERATIONS,
   });
   if (!result.valid) {
     return { solved: false, error: result.error, state };
   }
-
   const elapsedMs = Math.max(0, now - state.handStartedAt);
-  const gained = solveScore(elapsedMs);
-  const streak = state.streak + 1;
-  const records: Records = {
-    bestStreak: Math.max(state.records.bestStreak, streak),
-    bestTimeMs: state.records.bestTimeMs === null ? elapsedMs : Math.min(state.records.bestTimeMs, elapsedMs),
-  };
-  const next: GameState = {
-    ...state,
-    current: dealSolvableHand(state.variant, rng),
-    handStartedAt: now,
-    streak,
-    score: state.score + gained,
-    records,
-  };
-  return { solved: true, elapsedMs, gained, state: next };
+  const stars = starScore(elapsedMs);
+  const next = commit(state, dayKey, now, { correct: true, elapsedMs, star: stars }, null);
+  return { solved: true, elapsedMs, stars, state: next };
+}
+
+/** The result of a judge action ("no solution" or pass). */
+export interface DecisionOutcome {
+  correct: boolean;
+  /** A reveal when the action exposes an answer (wrong "no solution", or a pass). */
+  reveal: Reveal | null;
+  state: GameState;
+}
+
+/** Render a worked solution for the current hand, or null if it has none. */
+function revealFor(hand: DealtHand): Reveal {
+  if (!hand.solvable) return { solution: null };
+  const sol = findFirstSolution({ hand: hand.hand, target: hand.target, operations: CLASSIC_OPERATIONS });
+  return { solution: sol ? formatExpr(sol.expr) : null };
 }
 
 /**
- * Give up the current hand: the streak resets to 0 and a new hand is dealt.
- * Score total and personal bests are untouched — passing forfeits the streak,
- * nothing else.
+ * Claim the current hand has NO solution. Correct iff the hand is genuinely
+ * unsolvable (streak +1). If it WAS solvable this is wrong: reveal a solution,
+ * break the streak, count it incorrect.
  */
-export function passHand(state: GameState, now: number, rng?: Rng): GameState {
-  return {
-    ...state,
-    current: dealSolvableHand(state.variant, rng),
-    handStartedAt: now,
-    streak: 0,
-  };
+export function claimNoSolution(state: GameState, now: number, dayKey: string): DecisionOutcome {
+  const hand = currentHand(state);
+  if (!hand) return { correct: false, reveal: null, state };
+  const elapsedMs = Math.max(0, now - state.handStartedAt);
+  const correct = !hand.solvable;
+  if (correct) {
+    const stars = starScore(elapsedMs);
+    const next = commit(state, dayKey, now, { correct: true, elapsedMs, star: stars }, null);
+    return { correct: true, reveal: null, state: next };
+  }
+  const reveal = revealFor(hand);
+  const next = commit(state, dayKey, now, { correct: false, elapsedMs, star: 0 }, reveal);
+  return { correct: false, reveal, state: next };
+}
+
+/**
+ * Pass (give up) on the current hand: always counts incorrect — reveal a
+ * solution (or "none existed"), break the streak, advance. UI labels this "Pass".
+ */
+export function giveUp(state: GameState, now: number, dayKey: string): DecisionOutcome {
+  const hand = currentHand(state);
+  if (!hand) return { correct: false, reveal: null, state };
+  const elapsedMs = Math.max(0, now - state.handStartedAt);
+  const reveal = revealFor(hand);
+  const next = commit(state, dayKey, now, { correct: false, elapsedMs, star: 0 }, reveal);
+  return { correct: false, reveal, state: next };
 }
 
 // ---------------------------------------------------------------------------
-// Persistence (local high scores)
+// Persistence (per-variant stats)
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal async key/value store — the slice of AsyncStorage / expo-secure-store
- * the engine needs. Injected so the logic stays pure and is testable with an
- * in-memory fake; the real adapter is wired in at the screen layer (step 3).
+ * Minimal async key/value store — the slice of AsyncStorage the engine needs.
+ * Injected so the logic stays pure and is testable with an in-memory fake; the
+ * real adapter is wired in at the screen layer.
  */
 export interface KeyValueStore {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
 }
 
-const RECORDS_KEY = "twenty-something:records";
+const STATS_KEY = "twenty-something:stats:v2";
 
-/** Load saved records, returning fresh EMPTY_RECORDS on missing/corrupt data. */
-export async function loadRecords(store: KeyValueStore): Promise<Records> {
-  const raw = await store.getItem(RECORDS_KEY);
-  if (raw === null) return { ...EMPTY_RECORDS };
+/** Load saved stats, returning fresh emptyStats() on missing/corrupt data. */
+export async function loadStats(store: KeyValueStore): Promise<AllStats> {
+  const raw = await store.getItem(STATS_KEY);
+  if (raw === null) return emptyStats();
   try {
-    return sanitizeRecords(JSON.parse(raw));
+    return sanitizeStats(JSON.parse(raw));
   } catch {
-    return { ...EMPTY_RECORDS };
+    return emptyStats();
   }
 }
 
-/** Persist records as JSON under the records key. */
-export async function saveRecords(store: KeyValueStore, records: Records): Promise<void> {
-  await store.setItem(RECORDS_KEY, JSON.stringify(records));
+/** Persist stats as JSON. */
+export async function saveStats(store: KeyValueStore, stats: AllStats): Promise<void> {
+  await store.setItem(STATS_KEY, JSON.stringify(stats));
 }
 
-/** Coerce untrusted parsed JSON into a valid Records, dropping junk values. */
-function sanitizeRecords(x: unknown): Records {
+function num(x: unknown, floor = 0): number {
+  return typeof x === "number" && Number.isFinite(x) && x >= floor ? x : floor;
+}
+
+function sanitizeVariant(x: unknown): VariantStats {
   const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
-  const s = o.bestStreak;
+  const daysRaw = (typeof o.days === "object" && o.days !== null ? o.days : {}) as Record<string, unknown>;
+  const days: Record<string, DayBucket> = {};
+  for (const [key, v] of Object.entries(daysRaw)) {
+    const b = (typeof v === "object" && v !== null ? v : {}) as Record<string, unknown>;
+    days[key] = {
+      count: Math.floor(num(b.count)),
+      correctCount: Math.floor(num(b.correctCount)),
+      timeSumCorrect: num(b.timeSumCorrect),
+      starSum: num(b.starSum),
+    };
+  }
   const t = o.bestTimeMs;
   return {
-    bestStreak: typeof s === "number" && Number.isFinite(s) && s >= 0 ? Math.floor(s) : 0,
+    days,
+    bestStreak: Math.floor(num(o.bestStreak)),
     bestTimeMs: typeof t === "number" && Number.isFinite(t) && t >= 0 ? Math.floor(t) : null,
   };
+}
+
+/** Coerce untrusted parsed JSON into a valid AllStats, dropping junk values. */
+function sanitizeStats(x: unknown): AllStats {
+  const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
+  return { "24": sanitizeVariant(o["24"]), "20_something": sanitizeVariant(o["20_something"]) };
 }

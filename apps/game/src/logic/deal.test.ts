@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { isSolvable, computeTarget, CLASSIC_OPERATIONS } from "@twenty-something/core";
-import { dealSolvableHand } from "./engine.ts";
+import { dealHand, dealHands, dealDailyHands, epochDayFromKey } from "./engine.ts";
 
 // Deterministic PRNG so "random" deals are reproducible in tests.
 function mulberry32(seed: number): () => number {
@@ -15,31 +15,26 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-// An rng that returns a fixed queue of draws, then throws — for forcing a
-// specific deal sequence (each attempt consumes 4 value draws + 4 suit draws).
-function queuedRng(draws: number[]): () => number {
-  let i = 0;
-  return () => {
-    if (i >= draws.length) throw new Error("queuedRng exhausted");
-    return draws[i++]!;
-  };
-}
-
-test("only ever deals solvable hands (both variants)", () => {
+test("the solvable flag always matches core's solver (both variants)", () => {
   const rng = mulberry32(12345);
   for (let i = 0; i < 200; i++) {
     for (const variant of ["24", "20_something"] as const) {
-      const dealt = dealSolvableHand(variant, rng);
-      assert.ok(
-        isSolvable({ hand: dealt.hand, target: dealt.target, operations: CLASSIC_OPERATIONS }),
-        `dealt an unsolvable ${variant} hand: ${dealt.values}`,
-      );
+      const dealt = dealHand(variant, rng);
+      const truth = isSolvable({ hand: dealt.hand, target: dealt.target, operations: CLASSIC_OPERATIONS });
+      assert.equal(dealt.solvable, truth, `solvable flag wrong for ${variant} ${dealt.values}`);
     }
   }
 });
 
+test("natural distribution deals SOME unsolvable hands (no re-rolling)", () => {
+  const rng = mulberry32(999);
+  const hands = dealHands("24", 300, rng);
+  const unsolvable = hands.filter((h) => !h.solvable).length;
+  assert.ok(unsolvable > 0, "expected at least one unsolvable hand at natural distribution");
+});
+
 test("hand has ids c0..c3 and values/suits in range", () => {
-  const dealt = dealSolvableHand("24", mulberry32(7));
+  const dealt = dealHand("24", mulberry32(7));
   assert.equal(dealt.values.length, 4);
   assert.equal(dealt.suits.length, 4);
   assert.deepEqual(
@@ -56,29 +51,39 @@ test("hand has ids c0..c3 and values/suits in range", () => {
 test("target matches the variant: 24 is always 24, 20-something is 18 + 4th card", () => {
   const rng = mulberry32(99);
   for (let i = 0; i < 50; i++) {
-    const c = dealSolvableHand("24", rng);
+    const c = dealHand("24", rng);
     assert.equal(c.target, 24);
-    const t = dealSolvableHand("20_something", rng);
+    const t = dealHand("20_something", rng);
     assert.equal(t.target, 18 + t.hand[3]!.value);
     assert.equal(t.target, computeTarget("20_something", t.hand));
   }
 });
 
-test("re-rolls past an unsolvable hand instead of dealing it", () => {
-  // Draw value 1 from r=0 (1 + floor(0*13)); value 6 from r=5/13 (1 + floor(5)).
-  // Attempt 1 → [1,1,1,1], which cannot make 24 → must be skipped.
-  // Attempt 2 → [6,6,6,6], which makes 24 (6+6+6+6) → must be returned.
-  const draws = [
-    0, 0, 0, 0, 0, 0, 0, 0, // attempt 1: values [1,1,1,1], suits [0,0,0,0]
-    5 / 13, 5 / 13, 5 / 13, 5 / 13, 0, 0, 0, 0, // attempt 2: values [6,6,6,6]
-  ];
-  const dealt = dealSolvableHand("24", queuedRng(draws));
-  assert.deepEqual(dealt.values, [6, 6, 6, 6]);
-  assert.ok(isSolvable({ hand: dealt.hand, target: 24, operations: CLASSIC_OPERATIONS }));
+test("dealHands returns exactly n hands", () => {
+  assert.equal(dealHands("24", 5, mulberry32(1)).length, 5);
+  assert.equal(dealHands("20_something", 0, mulberry32(1)).length, 0);
 });
 
-test("is pure: same seed yields the same hand", () => {
-  const a = dealSolvableHand("20_something", mulberry32(42));
-  const b = dealSolvableHand("20_something", mulberry32(42));
+test("daily deal is deterministic: same date+variant ⇒ identical hands", () => {
+  const a = dealDailyHands("24", "2026-06-24", 5);
+  const b = dealDailyHands("24", "2026-06-24", 5);
   assert.deepEqual(a, b);
+  assert.equal(a.length, 5);
+});
+
+test("daily deal differs across dates and across variants", () => {
+  const d1 = dealDailyHands("24", "2026-06-24", 5);
+  const d2 = dealDailyHands("24", "2026-06-25", 5);
+  const v = dealDailyHands("20_something", "2026-06-24", 5);
+  assert.notDeepEqual(d1.map((h) => h.values), d2.map((h) => h.values));
+  assert.notDeepEqual(
+    d1.map((h) => h.values),
+    v.map((h) => h.values),
+  );
+});
+
+test("epochDayFromKey: consecutive days differ by 1, across a month boundary", () => {
+  assert.equal(epochDayFromKey("2026-07-01") - epochDayFromKey("2026-06-30"), 1);
+  assert.equal(epochDayFromKey("2026-01-01") - epochDayFromKey("2025-12-31"), 1);
+  assert.equal(epochDayFromKey("1970-01-01"), 0);
 });

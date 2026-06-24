@@ -19,12 +19,15 @@ import {
 
 import {
   newGame,
+  dealHands,
   submitSolution,
-  passHand,
-  loadRecords,
-  saveRecords,
+  claimNoSolution,
+  giveUp,
+  loadStats,
+  saveStats,
+  currentHand,
   type GameState,
-  type Records,
+  type AllStats,
 } from "./logic";
 import { storage } from "./storage";
 
@@ -35,6 +38,9 @@ const SUITS = [
   { s: "♣", red: false },
 ];
 
+/** Interim practice session length. Track S replaces this flow (play-setup → bounded session). */
+const SESSION_HANDS = 10;
+
 type Feedback = { kind: "solved" | "wrong"; big: string; sub: string };
 
 function pip(v: number): string {
@@ -43,6 +49,13 @@ function pip(v: number): string {
   if (v === 12) return "Q";
   if (v === 13) return "K";
   return String(v);
+}
+
+/** Local "YYYY-MM-DD" for per-day stats bucketing (computed at the screen boundary). */
+function localDayKey(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 /** Render the in-progress token sequence as a readable expression string. */
@@ -70,19 +83,6 @@ function formatSolve(ms: number): string {
   return formatClock(ms);
 }
 
-/** Take the better of two record sets (highest streak, fastest time). */
-function bestOf(a: Records, b: Records): Records {
-  return {
-    bestStreak: Math.max(a.bestStreak, b.bestStreak),
-    bestTimeMs:
-      a.bestTimeMs === null
-        ? b.bestTimeMs
-        : b.bestTimeMs === null
-          ? a.bestTimeMs
-          : Math.min(a.bestTimeMs, b.bestTimeMs),
-  };
-}
-
 /** Turn a validation failure into player-facing feedback. */
 function wrongFeedback(error: ValidationError, expr: Parameters<typeof safeEvaluate>[0], target: number): Feedback {
   if (error === "wrong_value") {
@@ -99,42 +99,57 @@ function wrongFeedback(error: ValidationError, expr: Parameters<typeof safeEvalu
   return { kind: "wrong", big: "Not a valid solution", sub: "try another combination" };
 }
 
+/** Start a fresh interim practice session on the given variant, keeping stats. */
+function freshGame(variant: Variant, stats?: AllStats): GameState {
+  return newGame(variant, dealHands(variant, SESSION_HANDS), { now: Date.now(), stats });
+}
+
 export default function App() {
-  const [game, setGame] = useState<GameState>(() =>
-    newGame("24", { now: Date.now(), records: { bestStreak: 0, bestTimeMs: null } }),
-  );
+  const [game, setGame] = useState<GameState>(() => freshGame("24"));
   const [tokens, setTokens] = useState<CheckerToken[]>([]);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [tick, setTick] = useState<number>(() => Date.now());
 
-  // Load saved records once on mount and fold them in (the run started with
-  // empty records; whatever's on disk is at least as good).
+  // Load saved stats once on mount and fold them in.
   useEffect(() => {
     let alive = true;
-    loadRecords(storage).then((recs) => {
-      if (alive) setGame((g) => ({ ...g, records: bestOf(g.records, recs) }));
+    loadStats(storage).then((stats) => {
+      if (alive) setGame((g) => ({ ...g, stats }));
     });
     return () => {
       alive = false;
     };
   }, []);
 
-  // Drive the live timer. The timer is a scoring input, never a fail clock.
+  // Drive the live timer.
   useEffect(() => {
     const id = setInterval(() => setTick(Date.now()), 250);
     return () => clearInterval(id);
   }, []);
 
-  const { variant, current, streak, score, records } = game;
-  const values = current.values;
+  // Auto-start the next interim session when this one is done.
+  useEffect(() => {
+    if (game.done) setGame(freshGame(game.variant, game.stats));
+  }, [game.done, game.variant, game.stats]);
+
+  const { variant, streak, session } = game;
+  const hand = currentHand(game);
+  const values = hand?.values ?? [];
   const elapsedMs = Math.max(0, tick - game.handStartedAt);
+  const accuracy = session.total === 0 ? "—" : `${session.correct}/${session.total}`;
+  const best = game.stats[variant];
 
   const usedIndices = tokens.filter((t) => t.type === "card").map((t) => (t as CardToken).i);
   const allFourUsed = [0, 1, 2, 3].every((i) => usedIndices.includes(i)) && usedIndices.length === 4;
-  const canSubmit = parseTokens(tokens) !== null && allFourUsed;
+  const canSubmit = hand != null && parseTokens(tokens) !== null && allFourUsed;
 
   const clearFeedback = () => {
     if (feedback) setFeedback(null);
+  };
+
+  const resetEntry = () => {
+    setTokens([]);
+    setFeedback(null);
   };
 
   const addCard = (i: number) => {
@@ -145,35 +160,57 @@ export default function App() {
   };
 
   const submit = () => {
+    if (!hand) return;
     const tree = parseTokens(tokens);
     if (!tree) return;
     const expr = fillValues(tree, values);
-    const out = submitSolution(game, expr, Date.now());
+    const out = submitSolution(game, expr, Date.now(), localDayKey());
     if (out.solved) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setGame(out.state);
-      setTokens([]);
-      setFeedback({ kind: "solved", big: `Solved in ${formatSolve(out.elapsedMs)}`, sub: `+${out.gained}  ·  streak ${out.state.streak}` });
-      saveRecords(storage, out.state.records).catch(() => {});
+      resetEntry();
+      setFeedback({ kind: "solved", big: `Solved in ${formatSolve(out.elapsedMs)}`, sub: `★ ${out.stars.toFixed(1)}  ·  streak ${out.state.streak}` });
+      saveStats(storage, out.state.stats).catch(() => {});
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setFeedback(wrongFeedback(out.error, expr, current.target));
+      setFeedback(wrongFeedback(out.error, expr, hand.target));
     }
   };
 
-  const pass = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    setGame(passHand(game, Date.now()));
+  const noSolution = () => {
+    if (!hand) return;
+    const out = claimNoSolution(game, Date.now(), localDayKey());
+    setGame(out.state);
     setTokens([]);
-    setFeedback(null);
+    if (out.correct) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setFeedback({ kind: "solved", big: "Correct — no solution", sub: `streak ${out.state.streak}` });
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setFeedback({ kind: "wrong", big: "It was solvable", sub: out.reveal?.solution ?? "—" });
+    }
+    saveStats(storage, out.state.stats).catch(() => {});
+  };
+
+  const pass = () => {
+    if (!hand) return;
+    const out = giveUp(game, Date.now(), localDayKey());
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    setGame(out.state);
+    setTokens([]);
+    setFeedback({
+      kind: "wrong",
+      big: "Passed",
+      sub: out.reveal?.solution ? `e.g. ${out.reveal.solution}` : "no solution existed",
+    });
+    saveStats(storage, out.state.stats).catch(() => {});
   };
 
   const changeVariant = (v: Variant) => {
     if (v === variant) return;
     Haptics.selectionAsync();
-    setGame(newGame(v, { now: Date.now(), records }));
-    setTokens([]);
-    setFeedback(null);
+    setGame(freshGame(v, game.stats));
+    resetEntry();
   };
 
   return (
@@ -196,32 +233,34 @@ export default function App() {
           <View style={styles.statsRow}>
             <Stat label="STREAK" value={String(streak)} />
             <Stat label="TIME" value={formatClock(elapsedMs)} emphasis />
-            <Stat label="SCORE" value={String(score)} />
+            <Stat label="ACCURACY" value={accuracy} />
           </View>
 
           <View style={styles.recordsRow}>
             <Text style={styles.recordsText}>
-              best streak {records.bestStreak}
+              best streak {best.bestStreak}
               {"   ·   "}
-              best time {records.bestTimeMs === null ? "—" : formatSolve(records.bestTimeMs)}
+              best time {best.bestTimeMs === null ? "—" : formatSolve(best.bestTimeMs)}
             </Text>
           </View>
 
           <View style={styles.targetReadout}>
             <Text style={styles.targetLabel}>MAKE</Text>
-            <Text style={styles.targetNum}>{current.target}</Text>
+            <Text style={styles.targetNum}>{hand?.target ?? "—"}</Text>
           </View>
 
-          <Text style={styles.cardsLabel}>Tap a card to add it to your expression</Text>
-          <CardRow
-            values={values}
-            suits={current.suits}
-            suitData={SUITS}
-            variant={variant}
-            mode="checker"
-            usedIndices={usedIndices}
-            onCardPress={addCard}
-          />
+          <Text style={styles.cardsLabel}>Tap a card to add it — or judge the hand below</Text>
+          {hand && (
+            <CardRow
+              values={values}
+              suits={hand.suits}
+              suitData={SUITS}
+              variant={variant}
+              mode="checker"
+              usedIndices={usedIndices}
+              onCardPress={addCard}
+            />
+          )}
 
           <Text style={styles.label}>Your expression</Text>
           <View style={styles.exprLine}>
@@ -246,9 +285,14 @@ export default function App() {
           <Pressable style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]} onPress={submit} disabled={!canSubmit}>
             <Text style={styles.primaryBtnText}>Submit</Text>
           </Pressable>
-          <Pressable style={styles.ghostBtn} onPress={pass}>
-            <Text style={styles.ghostBtnText}>Pass — breaks your streak</Text>
-          </Pressable>
+          <View style={styles.judgeRow}>
+            <Pressable style={styles.ghostBtn} onPress={noSolution}>
+              <Text style={styles.ghostBtnText}>No solution</Text>
+            </Pressable>
+            <Pressable style={styles.ghostBtn} onPress={pass}>
+              <Text style={styles.ghostBtnText}>Pass</Text>
+            </Pressable>
+          </View>
 
           {feedback && (
             <View style={[styles.verdict, feedback.kind === "solved" ? styles.verdictOk : styles.verdictNo]}>
@@ -345,7 +389,8 @@ const styles = StyleSheet.create({
   primaryBtn: { backgroundColor: colors.accent, borderRadius: 11, paddingVertical: 15, alignItems: "center" },
   primaryBtnDisabled: { opacity: 0.35 },
   primaryBtnText: { fontFamily: fonts.serif, fontSize: 16, fontWeight: "700", color: colors.accentInk },
-  ghostBtn: { marginTop: 9, borderColor: colors.line2, borderWidth: 1, borderRadius: radius.md, paddingVertical: 12, alignItems: "center" },
+  judgeRow: { flexDirection: "row", gap: 9, marginTop: 9 },
+  ghostBtn: { flex: 1, borderColor: colors.line2, borderWidth: 1, borderRadius: radius.md, paddingVertical: 12, alignItems: "center" },
   ghostBtnText: { fontFamily: fonts.sans, fontSize: 14, color: colors.inkDim },
   verdict: { marginTop: 20, padding: 16, borderRadius: 11, alignItems: "center", borderWidth: 1 },
   verdictOk: { backgroundColor: colors.verdictOkBg, borderColor: colors.good },

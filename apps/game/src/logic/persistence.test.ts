@@ -1,9 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { loadRecords, saveRecords, EMPTY_RECORDS, type KeyValueStore, type Records } from "./engine.ts";
+import {
+  loadStats,
+  saveStats,
+  emptyStats,
+  allTimeRollup,
+  type KeyValueStore,
+  type AllStats,
+} from "./engine.ts";
 
-// In-memory KeyValueStore standing in for AsyncStorage / expo-secure-store.
+// In-memory KeyValueStore standing in for AsyncStorage.
 function memStore(): KeyValueStore & { map: Map<string, string> } {
   const map = new Map<string, string>();
   return {
@@ -17,49 +24,66 @@ function memStore(): KeyValueStore & { map: Map<string, string> } {
   };
 }
 
-// Recover the storage key the engine uses (it's an internal constant) so tests
-// can inject raw/corrupt payloads without the engine exporting it.
-async function recordsKey(store: ReturnType<typeof memStore>): Promise<string> {
-  await saveRecords(store, EMPTY_RECORDS);
+// Recover the storage key the engine uses without exporting it.
+async function statsKey(store: ReturnType<typeof memStore>): Promise<string> {
+  await saveStats(store, emptyStats());
   const key = [...store.map.keys()][0];
-  assert.ok(key, "saveRecords should have written one key");
+  assert.ok(key, "saveStats should have written one key");
   return key;
 }
 
-test("loading from an empty store returns fresh empty records", async () => {
-  assert.deepEqual(await loadRecords(memStore()), EMPTY_RECORDS);
+function sample(): AllStats {
+  const s = emptyStats();
+  s["24"].days["2026-06-24"] = { count: 3, correctCount: 2, timeSumCorrect: 14000, starSum: 9.5 };
+  s["24"].bestStreak = 4;
+  s["24"].bestTimeMs = 3200;
+  s["20_something"].days["2026-06-23"] = { count: 1, correctCount: 1, timeSumCorrect: 6000, starSum: 4 };
+  s["20_something"].bestStreak = 1;
+  s["20_something"].bestTimeMs = 6000;
+  return s;
+}
+
+test("loading from an empty store returns fresh empty stats", async () => {
+  assert.deepEqual(await loadStats(memStore()), emptyStats());
 });
 
-test("save then load round-trips the records", async () => {
+test("save then load round-trips the stats", async () => {
   const store = memStore();
-  const records: Records = { bestStreak: 7, bestTimeMs: 3421 };
-  await saveRecords(store, records);
-  assert.deepEqual(await loadRecords(store), records);
+  const stats = sample();
+  await saveStats(store, stats);
+  assert.deepEqual(await loadStats(store), stats);
 });
 
-test("a null bestTimeMs (no solve yet) survives a round-trip", async () => {
+test("a round-tripped sample aggregates correctly", async () => {
   const store = memStore();
-  await saveRecords(store, { bestStreak: 2, bestTimeMs: null });
-  assert.deepEqual(await loadRecords(store), { bestStreak: 2, bestTimeMs: null });
+  await saveStats(store, sample());
+  const loaded = await loadStats(store);
+  const roll = allTimeRollup(loaded["24"]);
+  assert.equal(roll.count, 3);
+  assert.equal(roll.correctCount, 2);
+  assert.equal(roll.avgTimeMs, 7000); // 14000 / 2
 });
 
-test("corrupt JSON falls back to empty records instead of throwing", async () => {
+test("corrupt JSON falls back to empty stats instead of throwing", async () => {
   const store = memStore();
-  const key = await recordsKey(store);
+  const key = await statsKey(store);
   store.map.set(key, "{not valid json");
-  assert.deepEqual(await loadRecords(store), EMPTY_RECORDS);
+  assert.deepEqual(await loadStats(store), emptyStats());
 });
 
 test("junk values are sanitized: negatives/NaN/strings drop to defaults", async () => {
   const store = memStore();
-  const key = await recordsKey(store);
-  store.map.set(key, JSON.stringify({ bestStreak: -5, bestTimeMs: "fast" }));
-  assert.deepEqual(await loadRecords(store), { bestStreak: 0, bestTimeMs: null });
-});
-
-test("non-integer records are floored on load", async () => {
-  const store = memStore();
-  const key = await recordsKey(store);
-  store.map.set(key, JSON.stringify({ bestStreak: 3.9, bestTimeMs: 1500.7 }));
-  assert.deepEqual(await loadRecords(store), { bestStreak: 3, bestTimeMs: 1500 });
+  const key = await statsKey(store);
+  store.map.set(
+    key,
+    JSON.stringify({
+      "24": { days: { "2026-06-24": { count: -5, correctCount: "x", timeSumCorrect: NaN, starSum: 3 } }, bestStreak: -2, bestTimeMs: "fast" },
+    }),
+  );
+  const loaded = await loadStats(store);
+  assert.deepEqual(loaded["24"].days["2026-06-24"], { count: 0, correctCount: 0, timeSumCorrect: 0, starSum: 3 });
+  assert.equal(loaded["24"].bestStreak, 0);
+  assert.equal(loaded["24"].bestTimeMs, null);
+  // a totally missing variant still comes back as empty, not undefined
+  assert.deepEqual(loaded["20_something"], emptyStats()["20_something"]);
 });
