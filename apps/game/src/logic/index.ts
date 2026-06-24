@@ -4,3 +4,4 @@
  * import ./engine.ts directly with the explicit extension node requires.
  */
 export * from "./engine";
+export * from "./notifications";

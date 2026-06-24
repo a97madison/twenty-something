@@ -104,5 +104,6 @@ Highest-ROI next additions, in order:
 | **Functions deploy bundling (monorepo trap)** | ✅ fixed, verified |
 | Daily percentile | ⛔ needs Firebase login + Blaze + deploy (code + bundling done) |
 | Percentile emulator test | ⛔ needs a JDK installed locally |
-| Notifications (daily + weekly) | ⛔ needs dev build (scheduling math done) |
+| Notifications — scheduling brain | ✅ `planNotifications` built + tested (streak-risk / nudge / weekly) |
+| Notifications — OS delivery | ⛔ needs `expo-notifications` + a dev build to verify firing |
 | Store distribution | ⏳ needs EAS + store accounts |
