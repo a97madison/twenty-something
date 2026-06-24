@@ -12,3 +12,5 @@ export * from "./theme/tokens";
 export * from "./parser";
 export { CardRow } from "./CardRow";
 export { Keypad } from "./Keypad";
+export { CalcPad } from "./CalcPad";
+export type { SuitData, Paren, CalcPadFeedback } from "./CalcPad";
