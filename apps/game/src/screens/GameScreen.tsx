@@ -35,6 +35,10 @@ const SUITS: SuitData[] = [
   { s: "♣", red: false },
 ];
 
+/** How long the result/reveal lingers before auto-advancing (tap skips it). */
+const DWELL_OK_MS = 850;
+const DWELL_BAD_MS = 2600;
+
 /** True when the next token must be an OPERAND (a card or "(") — start of the
  * expression, or right after an operator or an opening paren. */
 function expectsOperand(tokens: CheckerToken[]): boolean {
@@ -50,6 +54,17 @@ function openParens(tokens: CheckerToken[]): number {
     else if (t.type === "rp") d--;
   }
   return d;
+}
+
+/**
+ * A committed decision held on screen so the player can read the result (and any
+ * revealed answer) before the next hand deals. `shownMs` freezes the timer at the
+ * solve time; `next` is the already-advanced engine state, applied on continue.
+ */
+interface Pending {
+  next: GameState;
+  shownMs: number;
+  dwell: number;
 }
 
 interface Props {
@@ -73,21 +88,25 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
   const [game, setGame] = useState<GameState>(() => newGame(variant, hands, { now: now(), stats: initialStats }));
   const [tokens, setTokens] = useState<CheckerToken[]>([]);
   const [feedback, setFeedback] = useState<CalcPadFeedback | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [tick, setTick] = useState<number>(() => now());
 
-  // Live timer.
+  // Live timer — paused while a result is held on screen.
   useEffect(() => {
+    if (pending) return;
     const id = setInterval(() => setTick(now()), 250);
     return () => clearInterval(id);
-  }, [now]);
+  }, [now, pending]);
 
   const hand = currentHand(game);
   const values = hand?.values ?? [];
-  const elapsedMs = Math.max(0, tick - game.handStartedAt);
+  // While a result is held, freeze the clock and show the just-decided tallies.
+  const view = pending ? pending.next : game;
+  const elapsedMs = pending ? pending.shownMs : Math.max(0, tick - game.handStartedAt);
 
   const usedIndices = tokens.filter((t): t is CardToken => t.type === "card").map((t) => t.i);
   const allFourUsed = usedIndices.length === 4 && [0, 1, 2, 3].every((i) => usedIndices.includes(i));
-  const canSubmit = hand != null && parseTokens(tokens) !== null && allFourUsed;
+  const canSubmit = !pending && hand != null && parseTokens(tokens) !== null && allFourUsed;
 
   // Green/red top-bar flash on each committed decision.
   const flash = useRef(new Animated.Value(0)).current;
@@ -104,16 +123,32 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
     clearFeedback();
   };
 
-  /** After a committed decision: persist, clear entry, and end the game if done. */
-  const afterCommit = (next: GameState) => {
-    setGame(next);
-    setTokens([]);
+  /** Hold a committed decision on screen; persist now, advance on continue. */
+  const settle = (next: GameState, kind: "ok" | "bad") => {
     onStats(next.stats);
-    if (next.done) setTimeout(() => onDone(next), 850);
+    setPending({ next, shownMs: Math.max(0, now() - game.handStartedAt), dwell: kind === "ok" ? DWELL_OK_MS : DWELL_BAD_MS });
   };
 
+  /** Leave the held result: deal the next hand, or end the session. */
+  const advance = () => {
+    if (!pending) return;
+    const { next } = pending;
+    setPending(null);
+    setFeedback(null);
+    setTokens([]);
+    if (next.done) onDone(next);
+    else setGame({ ...next, handStartedAt: now() }); // restart the clock for the fresh hand
+  };
+
+  // Auto-advance after the dwell; a tap on the overlay skips it.
+  useEffect(() => {
+    if (!pending) return;
+    const id = setTimeout(advance, pending.dwell);
+    return () => clearTimeout(id);
+  }, [pending]);
+
   const submit = () => {
-    if (!hand) return;
+    if (pending || !hand) return;
     const tree = parseTokens(tokens);
     if (!tree) return;
     const expr = fillValues(tree, values);
@@ -122,30 +157,32 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       pulse("ok");
       setFeedback({ kind: "ok", text: `solved in ${(out.elapsedMs / 1000).toFixed(1)}s · ★ ${out.stars.toFixed(1)}` });
-      afterCommit(out.state);
+      settle(out.state, "ok");
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      pulse("bad");
       setFeedback({ kind: "bad", text: wrongFeedbackText(out.error, expr, hand.target) });
     }
   };
 
   const noSolution = () => {
-    if (!hand) return;
+    if (pending || !hand) return;
     const out = claimNoSolution(game, now(), dayKey());
     if (out.correct) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       pulse("ok");
       setFeedback({ kind: "ok", text: "correct — no solution exists" });
+      settle(out.state, "ok");
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       pulse("bad");
       setFeedback({ kind: "bad", text: out.reveal?.solution ? `it was solvable: ${out.reveal.solution}` : "it was solvable" });
+      settle(out.state, "bad");
     }
-    afterCommit(out.state);
   };
 
   const pass = () => {
-    if (!hand) return;
+    if (pending || !hand) return;
     const out = giveUp(game, now(), dayKey());
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     pulse("bad");
@@ -153,7 +190,7 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
       kind: "bad",
       text: out.reveal?.solution ? `e.g. ${out.reveal.solution}` : "no solution existed",
     });
-    afterCommit(out.state);
+    settle(out.state, "bad");
   };
 
   const barBg = flash.interpolate({
@@ -178,10 +215,15 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
           </View>
           <View style={styles.barDivider} />
           <View style={styles.barCell}>
-            <Text style={styles.barLabel}>CORRECT</Text>
+            <Text style={styles.barLabel}>HAND</Text>
             <Text style={styles.barValue}>
-              {game.session.correct}/{game.session.total}
+              {Math.min(view.index + (pending ? 0 : 1), view.hands.length)}/{view.hands.length}
             </Text>
+          </View>
+          <View style={styles.barDivider} />
+          <View style={styles.barCell}>
+            <Text style={styles.barLabel}>STREAK</Text>
+            <Text style={[styles.barValue, view.streak >= 2 && styles.streakHot]}>{view.streak}</Text>
           </View>
         </Animated.View>
       </View>
@@ -200,14 +242,15 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
             dealNonce={game.index}
             onCardPress={(i) => {
               // Only feasible next inputs register (the keys aren't disabled).
-              if (usedIndices.includes(i) || !expectsOperand(tokens)) return;
+              if (pending || usedIndices.includes(i) || !expectsOperand(tokens)) return;
               push({ type: "card", i });
             }}
             onOp={(op) => {
-              if (expectsOperand(tokens)) return; // need a preceding operand
+              if (pending || expectsOperand(tokens)) return; // need a preceding operand
               push({ type: "op", op });
             }}
             onParen={(p) => {
+              if (pending) return;
               if (p === "(") {
                 if (!expectsOperand(tokens)) return;
                 push({ type: "lp" });
@@ -217,10 +260,12 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
               }
             }}
             onBackspace={() => {
+              if (pending) return;
               setTokens((cur) => cur.slice(0, -1));
               clearFeedback();
             }}
             onClear={() => {
+              if (pending) return;
               setTokens([]);
               clearFeedback();
             }}
@@ -229,6 +274,14 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
             onPass={pass}
             feedback={feedback}
           />
+        )}
+
+        {/* Result curtain: a transparent tap-anywhere layer that holds the hand on
+            screen so the verdict (and any revealed answer) is readable, then deals. */}
+        {pending && (
+          <Pressable style={styles.curtain} onPress={advance} accessibilityLabel="Continue">
+            <Text style={styles.curtainHint}>{pending.next.done ? "tap to see results" : "tap to continue"}</Text>
+          </Pressable>
         )}
       </View>
     </SafeAreaView>
@@ -251,5 +304,8 @@ const styles = StyleSheet.create({
   barDivider: { width: 1, alignSelf: "stretch", backgroundColor: colors.line, marginVertical: 6 },
   barLabel: { fontFamily: fonts.sans, fontSize: 10, letterSpacing: 1.2, color: colors.inkFaint },
   barValue: { fontFamily: fonts.serif, fontSize: 22, fontWeight: "700", color: colors.ink, marginTop: 1 },
+  streakHot: { color: colors.accent },
   pad: { flex: 1, marginTop: 14 },
+  curtain: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "flex-end", paddingBottom: 6 },
+  curtainHint: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 0.6, color: colors.inkFaint },
 });

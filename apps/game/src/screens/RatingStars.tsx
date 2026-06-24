@@ -11,8 +11,9 @@ interface Props {
 }
 
 /**
- * Five-star rating row with half-star resolution. Full stars up to floor(value),
- * a half star when the remainder ≥ 0.25, empty stars after. Purely visual.
+ * Five-star rating row. Each position fills once the rating reaches its midpoint
+ * (so a value of 2.5 lights three stars), rounding to the nearest whole star.
+ * The exact rating is shown numerically beside it. Purely visual.
  */
 export function RatingStars({ value, size = 22 }: Props) {
   const v = value ?? 0;

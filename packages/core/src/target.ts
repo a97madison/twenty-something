@@ -17,7 +17,7 @@ export const TWENTY_SOMETHING_BASE = 18;
  *
  * - "24"            → always 24, regardless of cards.
  * - "20_something"  → 18 + the 4th card's value.
- *                     e.g. 4th card is a Jack (11) → 18 + 11 → 27.
+ *                     e.g. 4th card is a Jack (11) → 18 + 11 → 29.
  *
  * The "4th card" is hand[3] — callers must deal cards in flip order so the
  * last-flipped card sits at index 3.

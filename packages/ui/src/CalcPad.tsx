@@ -130,6 +130,9 @@ export function CalcPad({
                   key={i}
                   value={values[i]!}
                   suit={suit}
+                  // In 20-Something every card reserves the label row so the 2×2
+                  // grid stays square; only the 4th card actually shows the badge.
+                  labeled={variant === "20_something"}
                   isTarget={variant === "20_something" && i === 3}
                   used={usedIndices.includes(i)}
                   index={i}
@@ -195,6 +198,8 @@ export function CalcPad({
 interface CardCellProps {
   value: number;
   suit: SuitData;
+  /** Reserve the label row above the card (kept uniform across the 2×2 grid). */
+  labeled: boolean;
   isTarget: boolean;
   used: boolean;
   index: number;
@@ -208,7 +213,7 @@ interface CardCellProps {
  * Animated API (no reanimated).
  * The two faces are stacked and back-face-hidden so only one shows at a time.
  */
-function CardCell({ value, suit, isTarget, used, index, dealNonce, onPress }: CardCellProps) {
+function CardCell({ value, suit, labeled, isTarget, used, index, dealNonce, onPress }: CardCellProps) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -228,7 +233,11 @@ function CardCell({ value, suit, isTarget, used, index, dealNonce, onPress }: Ca
 
   return (
     <View style={styles.cardWrap}>
-      {isTarget && <Text style={styles.targetMark}>TARGET CARD</Text>}
+      {labeled && (
+        <View style={styles.labelSlot}>
+          {isTarget && <Text style={styles.targetMark}>TARGET CARD</Text>}
+        </View>
+      )}
       <Tappable style={styles.cardAspect} onPress={onPress} disabled={used} accessibilityRole="button" accessibilityLabel={`Card ${index + 1}: ${pip(value)}${suit.s}`}>
         <Animated.View
           style={[styles.cardFace, { transform: [{ perspective: 800 }, { rotateY: backRotate }] }]}
@@ -294,6 +303,9 @@ const styles = StyleSheet.create({
   leftCol: { flex: 1 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   cardWrap: { width: "47.5%", alignItems: "center" },
+  // Fixed-height row above each card so the badge on the target card doesn't
+  // shove that one card down and skew the 2×2 grid.
+  labelSlot: { height: 14, justifyContent: "flex-end", alignItems: "center" },
   targetMark: {
     fontFamily: fonts.sans,
     fontSize: 9,
