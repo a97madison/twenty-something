@@ -171,6 +171,7 @@ export default function App() {
         <ValuePicker
           index={pickingIndex}
           current={pickingIndex === null ? null : values[pickingIndex]!}
+          red={pickingIndex === null ? false : SUITS[suits[pickingIndex]!]!.red}
           onSelect={setCardValue}
           onDismiss={() => setPickingIndex(null)}
         />

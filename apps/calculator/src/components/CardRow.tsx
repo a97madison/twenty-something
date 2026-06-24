@@ -45,13 +45,11 @@ export function CardRow({ values, suits, suitData, variant, mode, usedIndices, o
               accessibilityLabel={`Card ${i + 1}: ${pip(v)}${suit.s}`}
             >
               <Text style={[styles.cornerTL, { color: inkColor }]}>
-                {pip(v)}
-                {suit.s}
+                {pip(v)} {suit.s}
               </Text>
               <Text style={[styles.pip, { color: inkColor }]}>{pip(v)}</Text>
               <Text style={[styles.cornerBR, { color: inkColor }]}>
-                {pip(v)}
-                {suit.s}
+                {pip(v)} {suit.s}
               </Text>
             </Pressable>
             <Text style={styles.idx}>card {i + 1}</Text>

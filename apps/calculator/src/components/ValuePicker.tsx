@@ -6,6 +6,8 @@ interface Props {
   index: number | null;
   /** Current value of that card, to highlight the active chip. */
   current: number | null;
+  /** Whether the card being edited is a red suit — tints the numbers red. */
+  red: boolean;
   onSelect: (value: number) => void;
   onDismiss: () => void;
 }
@@ -21,7 +23,7 @@ function pip(v: number): string {
 }
 
 /** Tap-to-pick value editor for a single card (solver mode). */
-export function ValuePicker({ index, current, onSelect, onDismiss }: Props) {
+export function ValuePicker({ index, current, red, onSelect, onDismiss }: Props) {
   return (
     <Modal
       visible={index !== null}
@@ -47,7 +49,7 @@ export function ValuePicker({ index, current, onSelect, onDismiss }: Props) {
                   accessibilityState={{ selected: active }}
                   accessibilityLabel={`Set value ${pip(v)}`}
                 >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  <Text style={[styles.chipText, red && styles.chipTextRed]}>
                     {pip(v)}
                   </Text>
                 </Pressable>
@@ -84,10 +86,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     marginHorizontal: 2,
   },
-  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 7 },
+  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8 },
   chip: {
-    width: "12%",
-    paddingVertical: 13,
+    width: "16%",
+    paddingVertical: 16,
     backgroundColor: colors.panel,
     borderColor: colors.line,
     borderWidth: 1,
@@ -96,6 +98,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   chipActive: { borderColor: colors.accent, borderWidth: 1.5, backgroundColor: "#e8efe7" },
-  chipText: { fontFamily: fonts.serif, fontSize: 17, fontWeight: "700", color: colors.ink },
-  chipTextActive: { color: colors.accent },
+  chipText: {
+    fontFamily: fonts.serif,
+    fontSize: 22,
+    fontWeight: "700",
+    color: colors.ink,
+    textAlign: "center",
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+  chipTextRed: { color: colors.cardRed },
 });
