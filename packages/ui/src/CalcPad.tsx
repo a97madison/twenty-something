@@ -3,7 +3,7 @@ import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import type { Operation, Variant } from "@twenty-something/core";
 
-import { colors, fonts, radius } from "./theme/tokens";
+import { colors, fonts, radius, shadows } from "./theme/tokens";
 import { CARD_BACK } from "./cards";
 import { PlayingCard, CARD_ASPECT } from "./PlayingCard";
 import { Tappable } from "./Tappable";
@@ -44,7 +44,6 @@ interface Props {
   onOp: (op: Operation) => void;
   onParen: (p: Paren) => void;
   onBackspace: () => void;
-  onClear: () => void;
   /** `=` — commit the expression for judging. */
   onEquals: () => void;
   onNoSolution: () => void;
@@ -89,7 +88,6 @@ export function CalcPad({
   onOp,
   onParen,
   onBackspace,
-  onClear,
   onEquals,
   onNoSolution,
   onPass,
@@ -147,9 +145,6 @@ export function CalcPad({
           </View>
 
           <View style={styles.judgeRow}>
-            <Tappable style={styles.acBtn} onPress={tap(onClear)} accessibilityLabel="Clear">
-              <Text style={styles.acBtnText}>AC</Text>
-            </Tappable>
             <Tappable style={styles.judgeBtn} onPress={onNoSolution}>
               <Text style={styles.judgeBtnText}>No solution</Text>
             </Tappable>
@@ -295,6 +290,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",
+    ...shadows.accent,
   },
   targetPillText: { fontFamily: fonts.serifBold, fontSize: 24, color: colors.accentInk },
 
@@ -314,7 +310,7 @@ const styles = StyleSheet.create({
     color: colors.accent,
     marginBottom: 2,
   },
-  cardAspect: { width: "100%", aspectRatio: CARD_ASPECT },
+  cardAspect: { width: "100%", aspectRatio: CARD_ASPECT, borderRadius: 10, ...shadows.card },
   cardFace: {
     position: "absolute",
     top: 0,
@@ -336,17 +332,6 @@ const styles = StyleSheet.create({
   cardImg: { width: "100%", height: "100%" },
 
   judgeRow: { flexDirection: "row", gap: 10, marginTop: 10 },
-  acBtn: {
-    width: 58,
-    height: 52,
-    backgroundColor: colors.panel2,
-    borderColor: colors.line,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  acBtnText: { fontFamily: fonts.monoMedium, fontSize: 16, color: colors.ink },
   judgeBtn: {
     flex: 1,
     height: 52,
@@ -379,6 +364,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
+    ...shadows.accent,
   },
   equalsDisabled: { opacity: 0.35 },
   equalsText: { fontFamily: fonts.serifBold, fontSize: 32, color: colors.accentInk },

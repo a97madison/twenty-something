@@ -138,7 +138,6 @@ export default function App() {
             initialStats={stats}
             mode={config.mode}
             onDone={finishGame}
-            onQuit={() => setScreen("home")}
             onStats={persist}
             dayKey={localDayKey}
           />

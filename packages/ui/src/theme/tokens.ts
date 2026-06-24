@@ -52,6 +52,20 @@ export const radius = {
   lg: 16, // calculator card faces + target pill
 } as const;
 
+/**
+ * Elevation recipes — the "refined paper" depth language. Spread into a style
+ * (`...shadows.card`). `elevation` covers Android; the shadow* props cover
+ * iOS + web. Kept few and consistent so nothing floats arbitrarily.
+ */
+export const shadows = {
+  /** Lifts a playing card / primary panel off the paper. */
+  card: { shadowColor: "#2a2218", shadowOpacity: 0.16, shadowRadius: 9, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  /** Subtle lift for secondary surfaces (stat cells, ghost buttons). */
+  soft: { shadowColor: "#2a2218", shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  /** A felt-green glow under the primary action (Play, =, target pill). */
+  accent: { shadowColor: "#1f6b4a", shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+} as const;
+
 export const space = {
   xxl: 30,
 } as const;

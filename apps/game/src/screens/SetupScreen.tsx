@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Variant } from "@twenty-something/core";
-import { colors, fonts, radius, Tappable } from "@twenty-something/ui";
+import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
 import { variantLabel } from "./format";
 
@@ -83,6 +83,6 @@ const styles = StyleSheet.create({
   choiceText: { fontFamily: fonts.serifSemibold, fontSize: 16, color: colors.ink },
   choiceTextOn: { color: colors.accentInk },
   spacer: { flex: 1 },
-  start: { backgroundColor: colors.accent, paddingVertical: 17, borderRadius: radius.md, alignItems: "center", marginBottom: 48 },
+  start: { backgroundColor: colors.accent, paddingVertical: 17, borderRadius: radius.md, alignItems: "center", marginBottom: 48, ...shadows.accent },
   startText: { fontFamily: fonts.serifBold, fontSize: 18, color: colors.accentInk },
 });

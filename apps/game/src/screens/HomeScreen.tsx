@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, fonts, radius, Tappable } from "@twenty-something/ui";
+import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
 import { formatHoursMinutes, msUntilLocalMidnight } from "./format";
 
@@ -69,9 +69,9 @@ const styles = StyleSheet.create({
   menu: { paddingBottom: 48, gap: 12 },
   btn: { paddingVertical: 17, borderRadius: radius.md, alignItems: "center" },
   btnDisabled: { opacity: 0.5 },
-  primary: { backgroundColor: colors.accent },
+  primary: { backgroundColor: colors.accent, ...shadows.accent },
   primaryText: { fontFamily: fonts.serifBold, fontSize: 18, color: colors.accentInk },
-  secondary: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2 },
+  secondary: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2, ...shadows.soft },
   secondaryText: { fontFamily: fonts.serifSemibold, fontSize: 16, color: colors.ink },
   dailySub: { fontFamily: fonts.sans, fontSize: 11, color: colors.inkFaint, marginTop: 3 },
 });

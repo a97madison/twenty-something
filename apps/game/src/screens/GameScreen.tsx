@@ -74,8 +74,6 @@ interface Props {
   mode: "practice" | "daily";
   /** Called once the bounded session is over, with the final engine state. */
   onDone: (finalState: GameState) => void;
-  /** Quit back to home mid-game (no result recorded beyond what's already saved). */
-  onQuit: () => void;
   /** Persist updated stats after each committed decision. */
   onStats: (stats: AllStats) => void;
   /** Local "YYYY-MM-DD" supplier for per-day stats bucketing. */
@@ -84,7 +82,7 @@ interface Props {
   now?: () => number;
 }
 
-export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onStats, dayKey, now = Date.now }: Props) {
+export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayKey, now = Date.now }: Props) {
   const [game, setGame] = useState<GameState>(() => newGame(variant, hands, { now: now(), stats: initialStats }));
   const [tokens, setTokens] = useState<CheckerToken[]>([]);
   const [feedback, setFeedback] = useState<CalcPadFeedback | null>(null);
@@ -205,9 +203,6 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.topRow}>
-        <Pressable onPress={onQuit} hitSlop={10} accessibilityLabel="Quit to home">
-          <Text style={styles.quit}>✕</Text>
-        </Pressable>
         <Animated.View style={[styles.bar, { backgroundColor: barBg, borderColor: barBorder }]}>
           <View style={styles.barCell}>
             <Text style={styles.barLabel}>TIME</Text>
@@ -264,11 +259,6 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
               setTokens((cur) => cur.slice(0, -1));
               clearFeedback();
             }}
-            onClear={() => {
-              if (pending) return;
-              setTokens([]);
-              clearFeedback();
-            }}
             onEquals={submit}
             onNoSolution={noSolution}
             onPass={pass}
@@ -290,8 +280,7 @@ export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onSta
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 18 },
-  topRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 8 },
-  quit: { fontFamily: fonts.sans, fontSize: 22, color: colors.inkFaint, paddingHorizontal: 2 },
+  topRow: { flexDirection: "row", alignItems: "center", paddingTop: 8 },
   bar: {
     flex: 1,
     flexDirection: "row",

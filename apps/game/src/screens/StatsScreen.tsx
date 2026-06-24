@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Variant } from "@twenty-something/core";
-import { colors, fonts, radius, Tappable } from "@twenty-something/ui";
+import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
 import { VARIANTS, allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type Rollup } from "../logic";
 import { RatingStars } from "./RatingStars";
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   backText: { fontFamily: fonts.sans, fontSize: 15, color: colors.inkDim },
   scroll: { paddingHorizontal: 24, paddingBottom: 40 },
   title: { fontFamily: fonts.serifBold, fontSize: 30, color: colors.ink, marginTop: 8, marginBottom: 20 },
-  card: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 18, marginBottom: 16 },
+  card: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 18, marginBottom: 16, ...shadows.card },
   cardTitle: { fontFamily: fonts.serifBold, fontSize: 20, color: colors.accent, marginBottom: 14 },
   window: { gap: 10 },
   windowLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.3, color: colors.inkFaint },

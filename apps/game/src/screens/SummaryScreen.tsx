@@ -1,7 +1,7 @@
 import { Share, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { buildDailyShareText, type Variant } from "@twenty-something/core";
-import { colors, fonts, radius, Tappable } from "@twenty-something/ui";
+import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
 import { allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type GameState } from "../logic";
 import { RatingStars } from "./RatingStars";
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   headlineNum: { fontFamily: fonts.serifBold, fontSize: 44, color: colors.accent, marginTop: 8 },
   headlineLabel: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, color: colors.inkFaint },
   statsRow: { flexDirection: "row", gap: 10 },
-  cell: { flex: 1, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingVertical: 12, alignItems: "center" },
+  cell: { flex: 1, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingVertical: 12, alignItems: "center", ...shadows.soft },
   cellLabel: { fontFamily: fonts.sans, fontSize: 10, letterSpacing: 1, color: colors.inkFaint },
   cellValue: { fontFamily: fonts.serifBold, fontSize: 20, color: colors.ink, marginTop: 3 },
   percentile: { marginTop: 14, padding: 12, borderRadius: radius.md, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.line },
@@ -164,8 +164,8 @@ const styles = StyleSheet.create({
   locked: { fontFamily: fonts.sans, fontSize: 13, color: colors.inkFaint, fontStyle: "italic" },
   actions: { marginTop: 36, gap: 12 },
   btn: { paddingVertical: 16, borderRadius: radius.md, alignItems: "center" },
-  primary: { backgroundColor: colors.accent },
+  primary: { backgroundColor: colors.accent, ...shadows.accent },
   primaryText: { fontFamily: fonts.serifBold, fontSize: 17, color: colors.accentInk },
-  secondary: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2 },
+  secondary: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2, ...shadows.soft },
   secondaryText: { fontFamily: fonts.serifSemibold, fontSize: 16, color: colors.ink },
 });
