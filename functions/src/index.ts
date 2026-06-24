@@ -13,9 +13,15 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { initializeApp } from "firebase-admin/app";
 
-import { formatExpr, isWellFormedExpr } from "@twenty-something/core";
+import { formatExpr, isWellFormedExpr, type Variant } from "@twenty-something/core";
 import { verifySubmission } from "./verify.ts";
 import { applySolve, deriveSolveTimeSec, sanitizeAttempts, type StreakState } from "./streak.ts";
+import {
+  isDateKey,
+  dailyFieldKey,
+  validateRating,
+  computePercentile,
+} from "./percentile.ts";
 import type { DailyPuzzleDoc, UserDoc, RoomDoc, RoomRoundDoc } from "./model.ts";
 
 initializeApp();
@@ -119,6 +125,65 @@ export const submitDaily = onCall<SubmitInput>(async (request) => {
     currentStreak: outcome.currentStreak,
     maxStreak: outcome.maxStreak,
   };
+});
+
+// --------------------------------------------------------------------------
+// Daily game — submit a finished game's rating, get the field percentile
+// --------------------------------------------------------------------------
+//
+// The redesigned single-player daily: everyone plays the SAME N hands for a
+// date (dealt offline + deterministically by the game engine), then submits the
+// game's composite star RATING. The server records it and ranks it against
+// everyone who played that date+variant. See percentile.ts for the trust caveat
+// (the rating is client-measured; the percentile is social, not anti-cheat).
+
+interface DailyGameResultInput {
+  date?: unknown;
+  variant?: unknown;
+  rating?: unknown;
+}
+
+const VARIANTS = new Set<Variant>(["24", "20_something"]);
+
+export const submitDailyGameResult = onCall<DailyGameResultInput>(async (request) => {
+  const uid = requireUid(request.auth);
+  const { date, variant, rating } = request.data;
+
+  if (!isDateKey(date) || !VARIANTS.has(variant as Variant)) {
+    throw new HttpsError("invalid-argument", "Missing or malformed daily result.");
+  }
+  const v = validateRating(rating);
+  if (!v.ok) {
+    throw new HttpsError("invalid-argument", v.reason);
+  }
+
+  const playersCol = db
+    .doc(`dailyGameFields/${dailyFieldKey(date, variant as Variant)}`)
+    .collection("players");
+  const myRef = playersCol.doc(uid);
+
+  // First submit wins: a player's daily rating LOCKS on first submit, so a
+  // replay can't fish for a better score. Returns the effective (locked) rating.
+  const myRating = await db.runTransaction(async (tx) => {
+    const mine = await tx.get(myRef);
+    if (mine.exists) return (mine.data() as { rating: number }).rating;
+    tx.set(myRef, {
+      rating: v.rating,
+      variant,
+      date,
+      submittedAt: Timestamp.now(),
+    });
+    return v.rating;
+  });
+
+  // Rank against the whole field for this date+variant. Reading every player doc
+  // per submit is O(field) — fine at this scale; swap in a histogram aggregate
+  // if a day's field ever grows large.
+  const snap = await playersCol.get();
+  const field = snap.docs.map((d) => (d.data() as { rating: number }).rating);
+  const percentile = computePercentile(field, myRating);
+
+  return { rating: myRating, percentile, fieldSize: field.length };
 });
 
 // --------------------------------------------------------------------------

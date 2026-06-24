@@ -4,16 +4,23 @@
   "private": true,
   "description": "Cloud Functions: authoritative scoring for daily and online play. Imports @twenty-something/core as the cheat-proof verifier.",
   "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
   "scripts": {
     "pretest": "npm run build -w @twenty-something/core",
-    "test": "node --test --experimental-strip-types src/logic.test.ts",
-    "typecheck": "tsc --noEmit"
+    "test": "node --test --experimental-strip-types src/logic.test.ts src/daily.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build:deploy": "npm run build -w @twenty-something/core && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@twenty-something/core": "*"
+    "@twenty-something/core": "*",
+    "firebase-admin": "^13.10.0",
+    "firebase-functions": "^6.6.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
   }
 }
