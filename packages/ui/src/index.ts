@@ -10,6 +10,7 @@
 
 export * from "./theme/tokens";
 export * from "./parser";
+export { Tappable } from "./Tappable";
 export { CardRow } from "./CardRow";
 export { Keypad } from "./Keypad";
 export { CalcPad } from "./CalcPad";

@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import type { Operation, Variant } from "@twenty-something/core";
 
 import { colors, fonts, radius } from "./theme/tokens";
 import { CARD_BACK } from "./cards";
 import { PlayingCard, CARD_ASPECT } from "./PlayingCard";
+import { Tappable } from "./Tappable";
 
 /** Cosmetic suit glyph + ink colour. Index into this with a card's suit index. */
 export interface SuitData {
@@ -110,9 +111,9 @@ export function CalcPad({
         >
           {expression.length === 0 ? "tap cards & operators…" : expression}
         </Text>
-        <Pressable style={styles.exprBackspace} onPress={tap(onBackspace)} accessibilityLabel="Backspace">
+        <Tappable style={styles.exprBackspace} onPress={tap(onBackspace)} accessibilityLabel="Backspace">
           <Text style={styles.exprBackspaceText}>⌫</Text>
-        </Pressable>
+        </Tappable>
         <View style={styles.targetPill} accessibilityLabel={`Make ${target}`}>
           <Text style={styles.targetPillText}>{target}</Text>
         </View>
@@ -143,15 +144,15 @@ export function CalcPad({
           </View>
 
           <View style={styles.judgeRow}>
-            <Pressable style={styles.acBtn} onPress={tap(onClear)} accessibilityLabel="Clear">
+            <Tappable style={styles.acBtn} onPress={tap(onClear)} accessibilityLabel="Clear">
               <Text style={styles.acBtnText}>AC</Text>
-            </Pressable>
-            <Pressable style={styles.judgeBtn} onPress={onNoSolution}>
+            </Tappable>
+            <Tappable style={styles.judgeBtn} onPress={onNoSolution}>
               <Text style={styles.judgeBtnText}>No solution</Text>
-            </Pressable>
-            <Pressable style={styles.judgeBtn} onPress={onPass}>
+            </Tappable>
+            <Tappable style={styles.judgeBtn} onPress={onPass}>
               <Text style={styles.judgeBtnText}>Pass</Text>
-            </Pressable>
+            </Tappable>
           </View>
         </View>
 
@@ -160,17 +161,17 @@ export function CalcPad({
         <View style={styles.opCol}>
           <View style={styles.opStack}>
             {PARENS.map((p) => (
-              <Pressable key={p} style={styles.opKey} onPress={tap(() => onParen(p))}>
+              <Tappable key={p} style={styles.opKey} onPress={tap(() => onParen(p))}>
                 <Text style={styles.opKeyText}>{p}</Text>
-              </Pressable>
+              </Tappable>
             ))}
             {OPS.map((op) => (
-              <Pressable key={op} style={styles.opKey} onPress={tap(() => onOp(op))}>
+              <Tappable key={op} style={styles.opKey} onPress={tap(() => onOp(op))}>
                 <Text style={styles.opKeyText}>{op}</Text>
-              </Pressable>
+              </Tappable>
             ))}
           </View>
-          <Pressable
+          <Tappable
             style={[styles.equals, !canSubmit && styles.equalsDisabled]}
             onPress={onEquals}
             disabled={!canSubmit}
@@ -178,7 +179,7 @@ export function CalcPad({
             accessibilityLabel="Equals — submit"
           >
             <Text style={styles.equalsText}>=</Text>
-          </Pressable>
+          </Tappable>
         </View>
       </View>
 
@@ -202,8 +203,9 @@ interface CardCellProps {
 }
 
 /**
- * One card in the 2×2 grid. On each deal it flips from a felt-green back to its
- * face — a staggered rotateY using the built-in Animated API (no reanimated).
+ * One card in the 2×2 grid. Each starts face-down (felt-green back) and all four
+ * flip to their faces together on each deal — a rotateY using the built-in
+ * Animated API (no reanimated).
  * The two faces are stacked and back-face-hidden so only one shows at a time.
  */
 function CardCell({ value, suit, isTarget, used, index, dealNonce, onPress }: CardCellProps) {
@@ -213,12 +215,12 @@ function CardCell({ value, suit, isTarget, used, index, dealNonce, onPress }: Ca
     anim.setValue(0);
     Animated.timing(anim, {
       toValue: 1,
-      duration: 360,
-      delay: index * 90,
+      duration: 420,
+      delay: 0,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-    // Re-flip whenever a fresh hand is dealt.
+    // Re-flip whenever a fresh hand is dealt — all four flip together (no stagger).
   }, [dealNonce, anim, index]);
 
   const backRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] });
@@ -227,7 +229,7 @@ function CardCell({ value, suit, isTarget, used, index, dealNonce, onPress }: Ca
   return (
     <View style={styles.cardWrap}>
       {isTarget && <Text style={styles.targetMark}>TARGET CARD</Text>}
-      <Pressable style={styles.cardAspect} onPress={onPress} disabled={used} accessibilityRole="button" accessibilityLabel={`Card ${index + 1}: ${pip(value)}${suit.s}`}>
+      <Tappable style={styles.cardAspect} onPress={onPress} disabled={used} accessibilityRole="button" accessibilityLabel={`Card ${index + 1}: ${pip(value)}${suit.s}`}>
         <Animated.View
           style={[styles.cardFace, { transform: [{ perspective: 800 }, { rotateY: backRotate }] }]}
           pointerEvents="none"
@@ -240,7 +242,7 @@ function CardCell({ value, suit, isTarget, used, index, dealNonce, onPress }: Ca
         >
           <PlayingCard value={value} suitGlyph={suit.s} faded={used} style={styles.cardImg} />
         </Animated.View>
-      </Pressable>
+      </Tappable>
     </View>
   );
 }
