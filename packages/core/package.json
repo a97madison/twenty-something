@@ -1,0 +1,28 @@
+{
+  "name": "@twenty-something/core",
+  "version": "0.1.0",
+  "description": "Pure TypeScript engine for 24 and 20-Something: solving, validation, formatting, sharing. No UI, no backend. The single source of truth imported by the apps, the web build, and the Cloud Functions.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --experimental-strip-types src/*.test.ts",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "5.7"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "20-Something",
+    "slug": "twenty-something-calculator",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "twentysomething",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#efeade"
+    },
+    "ios": {
+      "bundleIdentifier": "com.twentysomething.calculator",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.twentysomething.calculator",
+      "adaptiveIcon": {
+        "backgroundColor": "#efeade"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

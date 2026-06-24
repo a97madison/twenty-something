@@ -1,0 +1,17 @@
+{
+  "name": "twenty-something",
+  "private": true,
+  "version": "0.1.0",
+  "description": "20-Something — a card arithmetic game and its companion tools. Monorepo: one tested engine behind the apps, web, and backend.",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "functions"
+  ],
+  "scripts": {
+    "pretest": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

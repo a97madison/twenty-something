@@ -1,0 +1,27 @@
+{
+  "name": "@twenty-something/calculator",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "20-Something calculator — solver + checker for the 24 and 20-Something card games. Expo/React Native, imports @twenty-something/core.",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@twenty-something/core": "*",
+    "expo": "~52.0.0",
+    "expo-haptics": "~14.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~18.3.0",
+    "typescript": "^5.7.0"
+  }
+}

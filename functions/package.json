@@ -1,0 +1,19 @@
+{
+  "name": "@twenty-something/functions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloud Functions: authoritative scoring for daily and online play. Imports @twenty-something/core as the cheat-proof verifier.",
+  "type": "module",
+  "scripts": {
+    "pretest": "npm run build -w @twenty-something/core",
+    "test": "node --test --experimental-strip-types src/logic.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@twenty-something/core": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}
