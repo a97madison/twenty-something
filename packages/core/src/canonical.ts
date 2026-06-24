@@ -17,6 +17,7 @@
  */
 
 import type { Expr, Operation, Solution } from "./types.ts";
+import { formatExpr } from "./format.ts";
 
 const COMMUTATIVE: Record<Operation, boolean> = {
   "+": true,
@@ -51,16 +52,29 @@ export function canonicalKey(expr: Expr): string {
 }
 
 /**
- * Drop solutions that are the same as an earlier one under canonical form,
- * keeping the first occurrence of each. Order is otherwise preserved.
+ * Drop solutions that are the same as an earlier one, keeping the first
+ * occurrence of each. Order is otherwise preserved.
+ *
+ * Two filters run together, because neither alone is enough:
+ *   - canonical key collapses commutative/associative + and × reorderings
+ *     (which render as DIFFERENT strings, e.g. `1 + 2 + 3` vs `3 + 2 + 1`).
+ *   - displayed string collapses structurally-different trees that render
+ *     IDENTICALLY, because `formatExpr` drops parens that are redundant for a
+ *     same-precedence ×/÷ chain — so `((2×3×4)÷1)`, `((4÷1)×2×3)` and
+ *     `(((3×4)÷1)×2)` all print as `2 × 3 × 4 ÷ 1` despite distinct keys.
+ * Keeping a solution only when BOTH its key and its text are new guarantees
+ * the list has no commutative twins AND no visually-identical rows.
  */
 export function dedupeSolutions(solutions: readonly Solution[]): Solution[] {
-  const seen = new Set<string>();
+  const seenKey = new Set<string>();
+  const seenText = new Set<string>();
   const out: Solution[] = [];
   for (const s of solutions) {
     const key = canonicalKey(s.expr);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const text = formatExpr(s.expr);
+    if (seenKey.has(key) || seenText.has(text)) continue;
+    seenKey.add(key);
+    seenText.add(text);
     out.push(s);
   }
   return out;

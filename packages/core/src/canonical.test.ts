@@ -63,3 +63,17 @@ test("dedupeSolutions collapses commutative twins, keeps the first", () => {
   assert.equal(out[0], first); // first occurrence kept, not the twin
   assert.equal(out[1], distinct);
 });
+
+test("dedupeSolutions collapses trees that render identically (distinct keys)", () => {
+  // Both print as "2 × 3 × 4 ÷ 1" but have different canonical keys, because
+  // formatExpr drops parens redundant in a same-precedence ×/÷ chain. Without
+  // the display filter these survive canonical dedup and show as twin rows.
+  const a = sol(mul(n(2), mul(n(3), div(n(4), n(1))))); // key ((4÷1)×2×3)
+  const b = sol(div(mul(mul(n(2), n(3)), n(4)), n(1))); // key ((2×3×4)÷1)
+  const distinct = sol(mul(div(mul(n(3), n(4)), n(1)), n(2))); // "3 × 4 ÷ 1 × 2"
+  assert.notEqual(canonicalKey(a.expr), canonicalKey(b.expr)); // canonical alone wouldn't collapse them
+  const out = dedupeSolutions([a, b, distinct]);
+  assert.equal(out.length, 2); // a and b are one visible row; distinct stays
+  assert.equal(out[0], a); // first occurrence kept, not its render-twin
+  assert.equal(out[1], distinct);
+});
