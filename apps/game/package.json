@@ -1,0 +1,16 @@
+{
+  "name": "@twenty-something/game",
+  "version": "0.1.0",
+  "private": true,
+  "description": "20-Something single-player game — offline timed solving with streaks. The pure game-logic module (node-tested) lands first; Expo/RN screens follow in step 3.",
+  "scripts": {
+    "test": "node --test --experimental-strip-types src/logic/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@twenty-something/core": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
