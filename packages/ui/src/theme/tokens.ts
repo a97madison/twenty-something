@@ -43,6 +43,7 @@ export const fonts = {
 export const radius = {
   sm: 8,
   md: 10,
+  lg: 16, // calculator card faces + target pill
 } as const;
 
 export const space = {
