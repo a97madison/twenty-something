@@ -1,6 +1,6 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Share, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import type { Variant } from "@twenty-something/core";
+import { buildDailyShareText, type Variant } from "@twenty-something/core";
 import { colors, fonts, radius, Tappable } from "@twenty-something/ui";
 
 import { allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type GameState } from "../logic";
@@ -38,6 +38,20 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
   const allTimeUnlocked = newRollup.count >= ALLTIME_GATE;
   const weeklyUnlocked = weekly.count >= WEEKLY_GATE;
   const delta = prevRollup.rating !== null && newRollup.rating !== null ? newRollup.rating - prevRollup.rating : null;
+
+  // Outcome-only daily share (never reveals a method) — built by core.
+  const onShare = () => {
+    const message = buildDailyShareText({
+      gameName: variantLabel(variant),
+      date: dayKey,
+      solved: s.correct,
+      total: s.total,
+      stars: sessionRating ?? undefined,
+      totalTimeSec: s.timeSumCorrect > 0 ? Math.round(s.timeSumCorrect / 1000) : undefined,
+      currentStreak: finalState.streak,
+    });
+    Share.share({ message }).catch(() => {});
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -94,7 +108,11 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
         )}
 
         <View style={styles.actions}>
-          {mode !== "daily" && (
+          {mode === "daily" ? (
+            <Tappable style={[styles.btn, styles.primary]} onPress={onShare}>
+              <Text style={styles.primaryText}>Share result</Text>
+            </Tappable>
+          ) : (
             <Tappable style={[styles.btn, styles.primary]} onPress={onPlayAgain}>
               <Text style={styles.primaryText}>Play again</Text>
             </Tappable>

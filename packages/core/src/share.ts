@@ -108,3 +108,53 @@ export function buildShareText(result: ShareableResult): string {
   if (result.url) lines.push(result.url);
   return lines.join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Daily session share (N hands) — the shareable result for the daily challenge
+// ---------------------------------------------------------------------------
+
+/** Outcome of a full daily session. OUTCOME-ONLY — no per-hand methods. */
+export interface DailyShareResult {
+  gameName: string; // e.g. "24" or "20-Something"
+  date: string; // "YYYY-MM-DD"
+  solved: number; // hands solved
+  total: number; // hands played
+  /** Session star rating, 0–5. */
+  stars?: number;
+  /** Total solve time over the solved hands, seconds. */
+  totalTimeSec?: number;
+  currentStreak?: number;
+  /** Optional server-computed rarity/percentile, e.g. "top 8%". Outcome, not method. */
+  rarity?: string;
+  url?: string;
+}
+
+/** Render a 0–5 rating as a five-star row, rounding to the nearest whole star. */
+function starRow(stars: number): string {
+  const n = Math.max(0, Math.min(5, Math.round(stars)));
+  return "★".repeat(n) + "☆".repeat(5 - n);
+}
+
+/**
+ * Build the public share text for a whole daily session. Same iron rule as the
+ * single-puzzle builder: OUTCOME-ONLY — solved count, rating, total time,
+ * streak, optional rarity — never a card, a target, a solution, or an operation.
+ * The grid of stars is this game's "Wordle pattern": how you did, not how it's done.
+ */
+export function buildDailyShareText(r: DailyShareResult): string {
+  const lines: string[] = [];
+  lines.push(`${r.gameName} Daily · ${r.date}`);
+  const rating = typeof r.stars === "number" ? `  ${starRow(r.stars)} ${r.stars.toFixed(1)}` : "";
+  lines.push(`${r.solved}/${r.total} solved${rating}`);
+
+  const detail: string[] = [];
+  if (typeof r.totalTimeSec === "number") detail.push(`⚡ ${formatTime(r.totalTimeSec)}`);
+  if (r.rarity) detail.push(`🏅 ${r.rarity}`);
+  if (detail.length) lines.push(detail.join("   "));
+
+  if (typeof r.currentStreak === "number" && r.currentStreak > 0) {
+    lines.push(`🔥 ${r.currentStreak} day streak`);
+  }
+  if (r.url) lines.push(r.url);
+  return lines.join("\n");
+}

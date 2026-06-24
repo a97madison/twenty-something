@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildShareText,
   buildVariantShare,
+  buildDailyShareText,
   formatExpr,
   formatTime,
   VARIANT_NAME,
@@ -11,6 +12,7 @@ import {
   type Hand,
   type ShareableResult,
   type ShareOutcome,
+  type DailyShareResult,
 } from "./index.ts";
 
 // A real solution kept around only to prove it can never leak into the share.
@@ -155,4 +157,44 @@ test("variant share inherits outcome-only safety (no method leak)", () => {
 test("VARIANT_NAME covers both variants", () => {
   assert.equal(VARIANT_NAME["24"], "24");
   assert.equal(VARIANT_NAME["20_something"], "20-Something");
+});
+
+// ---- daily session share ---------------------------------------------------
+
+const daily: DailyShareResult = {
+  gameName: "24",
+  date: "2026-06-24",
+  solved: 4,
+  total: 5,
+  stars: 4.2,
+  totalTimeSec: 38,
+  currentStreak: 6,
+  rarity: "top 8%",
+  url: "https://example.com/d/2026-06-24",
+};
+
+test("daily share carries outcome stats only", () => {
+  const text = buildDailyShareText(daily);
+  assert.match(text, /^24 Daily · 2026-06-24/);
+  assert.match(text, /4\/5 solved/);
+  assert.match(text, /★★★★☆ 4\.2/); // 4.2 → 4 filled stars
+  assert.match(text, /⚡ 0:38/);
+  assert.match(text, /🏅 top 8%/);
+  assert.match(text, /🔥 6 day streak/);
+  assert.match(text, /example\.com/);
+});
+
+test("CRITICAL: daily share reveals no method", () => {
+  const text = buildDailyShareText(daily);
+  assert.doesNotMatch(text, /[()]/, "leaked structure via parentheses");
+  assert.doesNotMatch(text, /[×÷]/, "leaked operations");
+  assert.doesNotMatch(text, /[➕➖✖️➗]/, "leaked operations");
+});
+
+test("daily share omits empty fields cleanly", () => {
+  const text = buildDailyShareText({ gameName: "24", date: "2026-06-24", solved: 0, total: 5 });
+  assert.match(text, /0\/5 solved/);
+  assert.doesNotMatch(text, /⚡/);
+  assert.doesNotMatch(text, /day streak/);
+  assert.doesNotMatch(text, /★/); // no rating → no star row
 });
