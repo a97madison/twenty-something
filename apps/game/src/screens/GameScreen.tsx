@@ -22,7 +22,6 @@ import {
   claimNoSolution,
   giveUp,
   currentHand,
-  handsTotal,
   type AllStats,
   type GameState,
   type DealtHand,
@@ -35,6 +34,23 @@ const SUITS: SuitData[] = [
   { s: "♦", red: true },
   { s: "♣", red: false },
 ];
+
+/** True when the next token must be an OPERAND (a card or "(") — start of the
+ * expression, or right after an operator or an opening paren. */
+function expectsOperand(tokens: CheckerToken[]): boolean {
+  const last = tokens[tokens.length - 1];
+  return !last || last.type === "op" || last.type === "lp";
+}
+
+/** Net unmatched "(" so far. */
+function openParens(tokens: CheckerToken[]): number {
+  let d = 0;
+  for (const t of tokens) {
+    if (t.type === "lp") d++;
+    else if (t.type === "rp") d--;
+  }
+  return d;
+}
 
 interface Props {
   variant: Variant;
@@ -53,7 +69,7 @@ interface Props {
   now?: () => number;
 }
 
-export function GameScreen({ variant, hands, initialStats, mode, onDone, onQuit, onStats, dayKey, now = Date.now }: Props) {
+export function GameScreen({ variant, hands, initialStats, onDone, onQuit, onStats, dayKey, now = Date.now }: Props) {
   const [game, setGame] = useState<GameState>(() => newGame(variant, hands, { now: now(), stats: initialStats }));
   const [tokens, setTokens] = useState<CheckerToken[]>([]);
   const [feedback, setFeedback] = useState<CalcPadFeedback | null>(null);
@@ -67,7 +83,6 @@ export function GameScreen({ variant, hands, initialStats, mode, onDone, onQuit,
 
   const hand = currentHand(game);
   const values = hand?.values ?? [];
-  const total = handsTotal(game);
   const elapsedMs = Math.max(0, tick - game.handStartedAt);
 
   const usedIndices = tokens.filter((t): t is CardToken => t.type === "card").map((t) => t.i);
@@ -171,10 +186,6 @@ export function GameScreen({ variant, hands, initialStats, mode, onDone, onQuit,
         </Animated.View>
       </View>
 
-      <Text style={styles.progress}>
-        {mode === "daily" ? "Daily · " : ""}Hand {Math.min(game.index + 1, total)} of {total}
-      </Text>
-
       <View style={styles.pad}>
         {hand && (
           <CalcPad
@@ -188,11 +199,23 @@ export function GameScreen({ variant, hands, initialStats, mode, onDone, onQuit,
             canSubmit={canSubmit}
             dealNonce={game.index}
             onCardPress={(i) => {
-              if (usedIndices.includes(i)) return;
+              // Only feasible next inputs register (the keys aren't disabled).
+              if (usedIndices.includes(i) || !expectsOperand(tokens)) return;
               push({ type: "card", i });
             }}
-            onOp={(op) => push({ type: "op", op })}
-            onParen={(p) => push(p === "(" ? { type: "lp" } : { type: "rp" })}
+            onOp={(op) => {
+              if (expectsOperand(tokens)) return; // need a preceding operand
+              push({ type: "op", op });
+            }}
+            onParen={(p) => {
+              if (p === "(") {
+                if (!expectsOperand(tokens)) return;
+                push({ type: "lp" });
+              } else {
+                if (expectsOperand(tokens) || openParens(tokens) <= 0) return;
+                push({ type: "rp" });
+              }
+            }}
             onBackspace={() => {
               setTokens((cur) => cur.slice(0, -1));
               clearFeedback();
@@ -228,6 +251,5 @@ const styles = StyleSheet.create({
   barDivider: { width: 1, alignSelf: "stretch", backgroundColor: colors.line, marginVertical: 6 },
   barLabel: { fontFamily: fonts.sans, fontSize: 10, letterSpacing: 1.2, color: colors.inkFaint },
   barValue: { fontFamily: fonts.serif, fontSize: 22, fontWeight: "700", color: colors.ink, marginTop: 1 },
-  progress: { fontFamily: fonts.sans, fontSize: 12, color: colors.inkFaint, textAlign: "center", marginTop: 12, marginBottom: 6 },
-  pad: { flex: 1, justifyContent: "center" },
+  pad: { flex: 1, marginTop: 14 },
 });
