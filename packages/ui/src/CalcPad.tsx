@@ -54,6 +54,8 @@ interface Props {
 
 /** Top-to-bottom operator column, iOS-calculator order. */
 const OPS: Operation[] = ["÷", "×", "-", "+"];
+/** Parens lead the operator column. */
+const PARENS: Paren[] = ["(", ")"];
 
 function pip(v: number): string {
   if (v === 1) return "A";
@@ -108,6 +110,9 @@ export function CalcPad({
         >
           {expression.length === 0 ? "tap cards & operators…" : expression}
         </Text>
+        <Pressable style={styles.exprBackspace} onPress={tap(onBackspace)} accessibilityLabel="Backspace">
+          <Text style={styles.exprBackspaceText}>⌫</Text>
+        </Pressable>
         <View style={styles.targetPill} accessibilityLabel={`Make ${target}`}>
           <Text style={styles.targetPillText}>{target}</Text>
         </View>
@@ -138,6 +143,9 @@ export function CalcPad({
           </View>
 
           <View style={styles.judgeRow}>
+            <Pressable style={styles.acBtn} onPress={tap(onClear)} accessibilityLabel="Clear">
+              <Text style={styles.acBtnText}>AC</Text>
+            </Pressable>
             <Pressable style={styles.judgeBtn} onPress={onNoSolution}>
               <Text style={styles.judgeBtnText}>No solution</Text>
             </Pressable>
@@ -147,8 +155,15 @@ export function CalcPad({
           </View>
         </View>
 
+        {/* One column: parens, then operators (all the same key scheme), then
+            the taller `=` accent key flush with the No-solution/Pass row. */}
         <View style={styles.opCol}>
           <View style={styles.opStack}>
+            {PARENS.map((p) => (
+              <Pressable key={p} style={styles.opKey} onPress={tap(() => onParen(p))}>
+                <Text style={styles.opKeyText}>{p}</Text>
+              </Pressable>
+            ))}
             {OPS.map((op) => (
               <Pressable key={op} style={styles.opKey} onPress={tap(() => onOp(op))}>
                 <Text style={styles.opKeyText}>{op}</Text>
@@ -165,22 +180,6 @@ export function CalcPad({
             <Text style={styles.equalsText}>=</Text>
           </Pressable>
         </View>
-      </View>
-
-      {/* Utility row: backspace · clear · ( · ) — iOS's ⌫ AC % shelf. */}
-      <View style={styles.utilRow}>
-        <Pressable style={styles.utilKey} onPress={tap(onBackspace)} accessibilityLabel="Backspace">
-          <Text style={styles.utilKeyText}>⌫</Text>
-        </Pressable>
-        <Pressable style={styles.utilKey} onPress={tap(onClear)} accessibilityLabel="Clear">
-          <Text style={styles.utilKeyText}>AC</Text>
-        </Pressable>
-        <Pressable style={styles.utilKey} onPress={tap(() => onParen("("))}>
-          <Text style={styles.utilKeyText}>(</Text>
-        </Pressable>
-        <Pressable style={styles.utilKey} onPress={tap(() => onParen(")"))}>
-          <Text style={styles.utilKeyText}>)</Text>
-        </Pressable>
       </View>
 
       {feedback && (
@@ -266,6 +265,17 @@ const styles = StyleSheet.create({
   },
   exprText: { flex: 1, fontFamily: fonts.mono, fontSize: 22, color: colors.ink, letterSpacing: 1 },
   exprPlaceholder: { flex: 1, fontFamily: fonts.sans, fontSize: 14, color: colors.inkFaint },
+  exprBackspace: {
+    width: 46,
+    alignSelf: "stretch",
+    backgroundColor: colors.panel2,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  exprBackspaceText: { fontFamily: fonts.mono, fontSize: 18, fontWeight: "500", color: colors.ink },
   targetPill: {
     minWidth: 56,
     paddingHorizontal: 14,
@@ -312,50 +322,52 @@ const styles = StyleSheet.create({
   cardImg: { width: "100%", height: "100%" },
 
   judgeRow: { flexDirection: "row", gap: 10, marginTop: 10 },
-  judgeBtn: {
-    flex: 1,
+  acBtn: {
+    width: 58,
     height: 52,
-    borderColor: colors.line2,
+    backgroundColor: colors.panel2,
+    borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  judgeBtnText: { fontFamily: fonts.sans, fontSize: 14, color: colors.inkDim },
-
-  // --- Operator column ------------------------------------------------------
-  opCol: { width: OP_COL_WIDTH },
-  opStack: { flex: 1, gap: 10, marginBottom: 10 },
-  opKey: {
+  acBtnText: { fontFamily: fonts.mono, fontSize: 16, fontWeight: "500", color: colors.ink },
+  judgeBtn: {
     flex: 1,
-    backgroundColor: colors.accent,
-    borderRadius: OP_COL_WIDTH / 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  opKeyText: { fontFamily: fonts.serif, fontSize: 26, fontWeight: "700", color: colors.accentInk },
-  equals: {
     height: 52,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.verdictNoBg,
+    borderColor: colors.bad,
+    borderWidth: 1,
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
   },
-  equalsDisabled: { opacity: 0.35 },
-  equalsText: { fontFamily: fonts.serif, fontSize: 30, fontWeight: "700", color: colors.accentInk },
+  judgeBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: "600", color: colors.verdictNoInk },
 
-  // --- Utility row ----------------------------------------------------------
-  utilRow: { flexDirection: "row", gap: 10, marginTop: 10 },
-  utilKey: {
+  // --- Operator column (parens + operators share one key scheme) -----------
+  opCol: { width: OP_COL_WIDTH },
+  opStack: { flex: 1, gap: 10, marginBottom: 10 },
+  opKey: {
     flex: 1,
     backgroundColor: colors.panel2,
     borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radius.md,
-    paddingVertical: 13,
     alignItems: "center",
+    justifyContent: "center",
   },
-  utilKeyText: { fontFamily: fonts.mono, fontSize: 18, fontWeight: "500", color: colors.ink },
+  opKeyText: { fontFamily: fonts.serif, fontSize: 22, fontWeight: "600", color: colors.ink },
+  // The one accent key in the column, deliberately taller than the op keys.
+  equals: {
+    height: 88,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  equalsDisabled: { opacity: 0.35 },
+  equalsText: { fontFamily: fonts.serif, fontSize: 32, fontWeight: "700", color: colors.accentInk },
 
   // --- Inline feedback ------------------------------------------------------
   feedback: { fontFamily: fonts.mono, fontSize: 13, textAlign: "center", marginTop: 14 },
