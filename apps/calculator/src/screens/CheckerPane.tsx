@@ -6,12 +6,12 @@ import {
   formatExpr,
   CLASSIC_OPERATIONS,
   type Hand,
-  type Expr,
   type Operation,
 } from "@twenty-something/core";
 
 import { colors, fonts, radius, space } from "../theme/tokens";
 import type { CheckerToken, CardToken, Verdict } from "../App";
+import { parseTokens, fillValues } from "./checkerParser";
 
 interface Props {
   values: number[];
@@ -21,6 +21,7 @@ interface Props {
   setTokens: (t: CheckerToken[]) => void;
   verdict: Verdict | null;
   setVerdict: (v: Verdict | null) => void;
+  onChecked: () => void;
 }
 
 function pip(v: number): string {
@@ -42,73 +43,9 @@ function tokenStr(tokens: CheckerToken[], values: number[]): string {
     .join("");
 }
 
-/**
- * Shunting-yard parser: tokens → Expr tree, or null if malformed/incomplete.
- * This is checker-UI logic (the user builds an expression by tapping); the
- * resulting Expr is then handed to core's validateSolution for the verdict, so
- * the actual correctness judgment uses the same authority as the server.
- */
-function parseTokens(tokens: CheckerToken[]): Expr | null {
-  const out: Expr[] = [];
-  const ops: string[] = [];
-  const prec: Record<string, number> = { "+": 1, "-": 1, "×": 2, "÷": 2 };
-  const pop = () => {
-    const op = ops.pop() as Operation;
-    const r = out.pop();
-    const l = out.pop();
-    if (!l || !r) throw new Error("bad");
-    out.push({ kind: "node", op, left: l, right: r });
-  };
-  try {
-    let prev: string | null = null;
-    for (const t of tokens) {
-      if (t.type === "card") {
-        if (prev === "val" || prev === "rp") throw new Error("bad");
-        out.push({ kind: "leaf", cardId: `c${t.i}`, value: 0 }); // value filled below
-        prev = "val";
-      } else if (t.type === "op") {
-        if (prev !== "val" && prev !== "rp") throw new Error("bad");
-        while (ops.length && ops[ops.length - 1] !== "(" && prec[ops[ops.length - 1]!]! >= prec[t.op]!) pop();
-        ops.push(t.op);
-        prev = "op";
-      } else if (t.type === "lp") {
-        if (prev === "val" || prev === "rp") throw new Error("bad");
-        ops.push("(");
-        prev = "lp";
-      } else {
-        while (ops.length && ops[ops.length - 1] !== "(") pop();
-        if (ops[ops.length - 1] !== "(") throw new Error("bad");
-        ops.pop();
-        prev = "rp";
-      }
-    }
-    while (ops.length) {
-      if (ops[ops.length - 1] === "(") throw new Error("bad");
-      pop();
-    }
-    if (out.length !== 1) return null;
-    return out[0]!;
-  } catch {
-    return null;
-  }
-}
-
-/** Fill leaf values from the real card values (parser used placeholders). */
-function fillValues(expr: Expr, values: number[]): Expr {
-  if (expr.kind === "leaf") {
-    const i = Number(expr.cardId.slice(1));
-    return { ...expr, value: values[i]! };
-  }
-  return {
-    ...expr,
-    left: fillValues(expr.left, values),
-    right: fillValues(expr.right, values),
-  };
-}
-
 const OPS: Operation[] = ["+", "-", "×", "÷"];
 
-export function CheckerPane({ values, hand, target, tokens, setTokens, verdict, setVerdict }: Props) {
+export function CheckerPane({ values, hand, target, tokens, setTokens, verdict, setVerdict, onChecked }: Props) {
   const edit = (next: CheckerToken[]) => {
     setTokens(next);
     setVerdict(null); // editing invalidates any prior verdict
@@ -190,7 +127,10 @@ export function CheckerPane({ values, hand, target, tokens, setTokens, verdict, 
 
       <Pressable
         style={[styles.primaryBtn, !canCheck && styles.primaryBtnDisabled]}
-        onPress={runCheck}
+        onPress={() => {
+          runCheck();
+          onChecked();
+        }}
         disabled={!canCheck}
       >
         <Text style={styles.primaryBtnText}>Check answer</Text>

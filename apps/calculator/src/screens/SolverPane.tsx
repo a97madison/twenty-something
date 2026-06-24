@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, Pressable } from "react-native";
 import * as Haptics from "expo-haptics";
 import {
   findAllSolutions,
+  dedupeSolutions,
   formatExpr,
   CLASSIC_OPERATIONS,
   type Hand,
@@ -10,6 +11,7 @@ import {
 } from "@twenty-something/core";
 
 import { colors, fonts, radius, space } from "../theme/tokens";
+import { randomHand } from "../hand";
 
 interface Props {
   hand: Hand;
@@ -23,24 +25,16 @@ export function SolverPane({ hand, target, onDealRandom }: Props) {
   const runSolve = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const sols = findAllSolutions({ hand, target, operations: CLASSIC_OPERATIONS });
-    // De-dupe by formatted string for a cleaner list.
-    const byStr = new Map<string, Solution>();
-    for (const s of sols) {
-      const f = formatExpr(s.expr);
-      if (!byStr.has(f)) byStr.set(f, s);
-    }
-    setSolutions([...byStr.values()]);
+    // Collapse solutions that differ only by commuting/re-associating + and ×.
+    setSolutions(dedupeSolutions(sols));
   };
 
   const dealRandom = () => {
     Haptics.selectionAsync();
-    const v = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 13));
-    const s = Array.from({ length: 4 }, () => Math.floor(Math.random() * 4));
-    onDealRandom(v, s);
+    const { values, suits } = randomHand();
+    onDealRandom(values, suits);
     setSolutions(null);
   };
-
-  const shown = solutions?.slice(0, 8) ?? [];
 
   return (
     <View style={styles.pane}>
@@ -64,9 +58,8 @@ export function SolverPane({ hand, target, onDealRandom }: Props) {
             <>
               <Text style={styles.resultHead}>
                 {solutions.length} solution{solutions.length > 1 ? "s" : ""} for {target}
-                {solutions.length > 8 ? " · showing 8" : ""}
               </Text>
-              {shown.map((s, idx) => (
+              {solutions.map((s, idx) => (
                 <View key={idx} style={styles.sol}>
                   <Text style={styles.solText}>
                     {formatExpr(s.expr)} = {target}

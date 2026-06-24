@@ -32,7 +32,7 @@ export function CardRow({ values, suits, suitData, variant, mode, usedIndices, o
         const inkColor = suit.red ? colors.cardRed : colors.cardBlack;
         return (
           <View key={i} style={styles.cardWrap}>
-            {isFourth && <Text style={styles.fourthMark}>4th</Text>}
+            {isFourth && <Text style={styles.fourthMark}>TARGET CARD</Text>}
             <Pressable
               onPress={() => onCardPress(i)}
               disabled={used}
@@ -68,9 +68,11 @@ const styles = StyleSheet.create({
   fourthMark: {
     fontFamily: fonts.sans,
     fontSize: 9,
-    letterSpacing: 1,
+    fontWeight: "600",
+    letterSpacing: 0.5,
     color: colors.accent,
     marginBottom: 2,
+    textAlign: "center",
   },
   card: {
     width: "100%",

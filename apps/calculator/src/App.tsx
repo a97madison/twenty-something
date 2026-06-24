@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
-import { StyleSheet, Text, View, Pressable, ScrollView, SafeAreaView } from "react-native";
+import { useState, useCallback, useRef } from "react";
+import { StyleSheet, Text, View, Pressable, ScrollView } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import {
@@ -8,8 +9,10 @@ import {
   type Card as CardModel,
 } from "@twenty-something/core";
 
-import { colors, fonts, radius, space } from "./theme/tokens";
+import { colors, fonts } from "./theme/tokens";
+import { randomHand } from "./hand";
 import { CardRow } from "./components/CardRow";
+import { ValuePicker } from "./components/ValuePicker";
 import { SolverPane } from "./screens/SolverPane";
 import { CheckerPane } from "./screens/CheckerPane";
 
@@ -34,9 +37,11 @@ function toHand(values: number[]): readonly [CardModel, CardModel, CardModel, Ca
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("solver");
-  const [variant, setVariant] = useState<Variant>("20_something");
-  const [values, setValues] = useState<number[]>([7, 4, 2, 3]);
-  const [suits, setSuits] = useState<number[]>([0, 1, 2, 3]);
+  const [variant, setVariant] = useState<Variant>("24");
+  // Deal a fresh random hand on each launch (lazy init runs once on mount).
+  const [initial] = useState(randomHand);
+  const [values, setValues] = useState<number[]>(initial.values);
+  const [suits, setSuits] = useState<number[]>(initial.suits);
 
   // Checker state lives here in the parent so it survives mode switches —
   // the same persistence the prototype's loop established. Tokens are the
@@ -44,6 +49,15 @@ export default function App() {
   // actually changes.
   const [tokens, setTokens] = useState<CheckerToken[]>([]);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  // Which card the value picker is editing (solver mode), or null when closed.
+  const [pickingIndex, setPickingIndex] = useState<number | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // After a check, reveal the verdict (it renders below the fold). Deferred a
+  // frame so the verdict has been laid out before we scroll to it.
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+  }, []);
 
   const hand = toHand(values);
   const target = computeTarget(variant, hand);
@@ -56,17 +70,17 @@ export default function App() {
     setVerdict(null);
   }, []);
 
-  const onCyclecard = useCallback(
-    (i: number) => {
-      if (mode === "checker") return; // in checker, cards add to the expression
+  // Picking a value edits only that card's value; suit is left as dealt.
+  const setCardValue = useCallback(
+    (value: number) => {
+      if (pickingIndex === null) return;
       Haptics.selectionAsync();
       const v = values.slice();
-      const s = suits.slice();
-      v[i] = (v[i]! >= 13 ? 1 : v[i]! + 1);
-      s[i] = ((s[i]! + 1) % 4);
-      changeHand(v, s);
+      v[pickingIndex] = value;
+      changeHand(v, suits);
+      setPickingIndex(null);
     },
-    [mode, values, suits, changeHand],
+    [pickingIndex, values, suits, changeHand],
   );
 
   const onChangeVariant = useCallback((v: Variant) => {
@@ -76,82 +90,92 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Text style={styles.wordmark}>
-            20<Text style={styles.wordmarkDot}>·</Text>Something
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safe}>
+        <StatusBar style="dark" />
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text style={styles.wordmark}>
+              20<Text style={styles.wordmarkDot}>·</Text>Something
+            </Text>
+            <Text style={styles.tagline}>calculator</Text>
+          </View>
+
+          <View style={styles.modebar}>
+            <ModeTab label="Solver" active={mode === "solver"} onPress={() => setMode("solver")} />
+            <ModeTab label="Checker" active={mode === "checker"} onPress={() => setMode("checker")} />
+          </View>
+
+          <View style={styles.variantbar}>
+            <VariantButton
+              name="24"
+              active={variant === "24"}
+              onPress={() => onChangeVariant("24")}
+            />
+            <VariantButton
+              name="20-Something"
+              desc="18 + target card"
+              active={variant === "20_something"}
+              onPress={() => onChangeVariant("20_something")}
+            />
+          </View>
+
+          <View style={styles.targetReadout}>
+            <Text style={styles.targetLabel}>TARGET</Text>
+            <Text style={styles.targetNum}>{target}</Text>
+          </View>
+
+          <Text style={styles.cardsLabel}>
+            {mode === "solver"
+              ? "Tap a card to change its value"
+              : "Tap a card to add it to your expression"}
           </Text>
-          <Text style={styles.tagline}>calculator</Text>
-        </View>
 
-        <View style={styles.modebar}>
-          <ModeTab label="Solver" active={mode === "solver"} onPress={() => setMode("solver")} />
-          <ModeTab label="Checker" active={mode === "checker"} onPress={() => setMode("checker")} />
-        </View>
-
-        <View style={styles.variantbar}>
-          <VariantButton
-            name="24"
-            desc="Always make 24"
-            active={variant === "24"}
-            onPress={() => onChangeVariant("24")}
-          />
-          <VariantButton
-            name="20-Something"
-            desc="18 + the 4th card"
-            active={variant === "20_something"}
-            onPress={() => onChangeVariant("20_something")}
-          />
-        </View>
-
-        <View style={styles.targetReadout}>
-          <Text style={styles.targetLabel}>TARGET</Text>
-          <Text style={styles.targetNum}>{target}</Text>
-        </View>
-
-        <Text style={styles.cardsLabel}>
-          {mode === "solver"
-            ? "Tap a card to change its value"
-            : "Tap a card to add it to your expression"}
-        </Text>
-
-        <CardRow
-          values={values}
-          suits={suits}
-          suitData={SUITS}
-          variant={variant}
-          mode={mode}
-          usedIndices={tokens.filter((t) => t.type === "card").map((t) => (t as CardToken).i)}
-          onCardPress={(i) => {
-            if (mode === "solver") {
-              onCyclecard(i);
-            } else {
-              const already = tokens.some((t) => t.type === "card" && (t as CardToken).i === i);
-              if (already) return;
-              Haptics.selectionAsync();
-              setTokens([...tokens, { type: "card", i }]);
-              setVerdict(null);
-            }
-          }}
-        />
-
-        {mode === "solver" ? (
-          <SolverPane hand={hand} target={target} onDealRandom={changeHand} />
-        ) : (
-          <CheckerPane
+          <CardRow
             values={values}
-            hand={hand}
-            target={target}
-            tokens={tokens}
-            setTokens={setTokens}
-            verdict={verdict}
-            setVerdict={setVerdict}
+            suits={suits}
+            suitData={SUITS}
+            variant={variant}
+            mode={mode}
+            usedIndices={tokens.filter((t) => t.type === "card").map((t) => (t as CardToken).i)}
+            onCardPress={(i) => {
+              if (mode === "solver") {
+                Haptics.selectionAsync();
+                setPickingIndex(i);
+              } else {
+                const already = tokens.some((t) => t.type === "card" && (t as CardToken).i === i);
+                if (already) return;
+                Haptics.selectionAsync();
+                setTokens([...tokens, { type: "card", i }]);
+                setVerdict(null);
+              }
+            }}
           />
-        )}
-      </ScrollView>
-    </SafeAreaView>
+
+          {mode === "solver" ? (
+            <SolverPane hand={hand} target={target} onDealRandom={changeHand} />
+          ) : (
+            <CheckerPane
+              values={values}
+              hand={hand}
+              target={target}
+              tokens={tokens}
+              setTokens={setTokens}
+              verdict={verdict}
+              setVerdict={setVerdict}
+              onChecked={scrollToBottom}
+            />
+          )}
+        </ScrollView>
+
+        <ValuePicker
+          index={pickingIndex}
+          current={pickingIndex === null ? null : values[pickingIndex]!}
+          onSelect={setCardValue}
+          onDismiss={() => setPickingIndex(null)}
+        />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -175,7 +199,7 @@ function VariantButton({
   onPress,
 }: {
   name: string;
-  desc: string;
+  desc?: string;
   active: boolean;
   onPress: () => void;
 }) {
@@ -187,7 +211,7 @@ function VariantButton({
       accessibilityState={{ selected: active }}
     >
       <Text style={styles.variantName}>{name}</Text>
-      <Text style={styles.variantDesc}>{desc}</Text>
+      {desc ? <Text style={styles.variantDesc}>{desc}</Text> : null}
     </Pressable>
   );
 }

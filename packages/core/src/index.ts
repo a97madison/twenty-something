@@ -10,5 +10,6 @@ export * from "./types.ts";
 export * from "./target.ts";
 export * from "./evaluator.ts";
 export * from "./solver.ts";
+export * from "./canonical.ts";
 export * from "./format.ts";
 export * from "./share.ts";

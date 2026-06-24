@@ -34,6 +34,9 @@ firebase-debug.log
 .env.*
 !.env.example
 
+# Notes (local working memory, not shared)
+notes.md
+
 # OS / editor
 .DS_Store
 Thumbs.db
