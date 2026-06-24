@@ -236,7 +236,7 @@ function CardCell({ value, suit, isTarget, used, index, dealNonce, onPress }: Ca
           <Image source={CARD_BACK} style={styles.cardImg} resizeMode="contain" />
         </Animated.View>
         <Animated.View
-          style={[styles.cardFace, { transform: [{ perspective: 800 }, { rotateY: faceRotate }] }]}
+          style={[styles.cardFace, styles.cardFaceFront, { transform: [{ perspective: 800 }, { rotateY: faceRotate }] }]}
           pointerEvents="none"
         >
           <PlayingCard value={value} suitGlyph={suit.s} faded={used} style={styles.cardImg} />
@@ -300,6 +300,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backfaceVisibility: "hidden",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  // The transparent pip PNGs sit on a real white card face, like a playing card.
+  cardFaceFront: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.line,
   },
   cardImg: { width: "100%", height: "100%" },
 
