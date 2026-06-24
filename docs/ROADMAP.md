@@ -50,7 +50,7 @@ The **logic already exists** in `functions/` (`submitDaily`, `computePercentile`
 
 **Still yours (account-gated):** `firebase login`, create the `twenty-something-dev` project, **enable Blaze billing** (2nd-gen functions require it), then `firebase deploy --only firestore:rules,functions`.
 
-**Blocked locally:** the emulator integration test (`submitDaily` → percentile) needs the **Firestore emulator, which requires a JDK** that isn't installed on this machine. Install a JDK (e.g. Temurin 17) and `firebase emulators:start` to run it — the test asserts the first-solver/percentile path before you ship.
+**Verified locally (done):** `npm run test:emulator` boots auth+firestore+functions on a `demo-ts` project (no login/billing) and runs `functions/integration/percentile.test.mjs` — **5/5 e2e assertions pass**: the bundled-core artifact loads in the real Firebase runtime, `submitDailyGameResult` enforces auth, a rating of 3 in a field of 5 returns the 60th percentile (mid-rank), the score locks on first submit (anti-fishing), and the two variant fields stay isolated. So the backend is proven correct and deployable — deploy is now purely your login/billing step.
 
 ## 4. Notifications — BLOCKED on a dev build (logic ready)
 
@@ -102,8 +102,8 @@ Highest-ROI next additions, in order:
 | Fractional star fill | ✅ shipped |
 | **Daily share button (outcome-only)** | ✅ shipped, tested |
 | **Functions deploy bundling (monorepo trap)** | ✅ fixed, verified |
-| Daily percentile | ⛔ needs Firebase login + Blaze + deploy (code + bundling done) |
-| Percentile emulator test | ⛔ needs a JDK installed locally |
+| **Percentile backend (emulator-verified)** | ✅ 5/5 e2e passing vs live emulator (`npm run test:emulator`) |
+| Daily percentile (production) | ⛔ only needs your `firebase login` + Blaze + `firebase deploy` |
 | Notifications — scheduling brain | ✅ `planNotifications` built + tested (streak-risk / nudge / weekly) |
 | Notifications — OS delivery | ⛔ needs `expo-notifications` + a dev build to verify firing |
 | Store distribution | ⏳ needs EAS + store accounts |
