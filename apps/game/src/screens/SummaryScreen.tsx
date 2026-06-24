@@ -3,9 +3,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Variant } from "@twenty-something/core";
 import { colors, fonts, radius, Tappable } from "@twenty-something/ui";
 
-import { allTimeRollup, weeklyRollup, type AllStats, type GameState } from "../logic";
+import { allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type GameState } from "../logic";
 import { RatingStars } from "./RatingStars";
-import { formatAccuracy, formatRating, formatSolve, variantLabel } from "./format";
+import { formatAccuracy, formatCloses, formatRating, formatSolve, variantLabel } from "./format";
 
 /** Lifetime hands before the all-time rating unlocks. */
 const ALLTIME_GATE = 10;
@@ -80,7 +80,7 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
           <Text style={styles.locked}>Play {ALLTIME_GATE - newRollup.count} more hand{ALLTIME_GATE - newRollup.count === 1 ? "" : "s"} to unlock your rating.</Text>
         )}
 
-        <Text style={styles.section}>THIS WEEK</Text>
+        <Text style={styles.section}>THIS WEEK ({formatCloses(msUntilWeeklyReset(Date.now()))})</Text>
         {weeklyUnlocked ? (
           <View style={styles.weeklyRow}>
             <RatingStars value={weekly.rating} size={18} />

@@ -231,14 +231,27 @@ export function allTimeRollup(vs: VariantStats): Rollup {
   return rollup(Object.values(vs.days));
 }
 
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+
 /**
- * Rolling-7-day rollup for a variant: buckets whose dayKey falls within the 7
- * days ending at `todayKey` (today and the 6 prior days). Pure — the SCREEN
- * passes today's local dayKey.
+ * Monday-based day index (0 = Mon … 6 = Sun) for a days-since-epoch count.
+ * Epoch day 0 (1970-01-01) was a Thursday, i.e. Monday-index 3.
+ */
+function mondayDow(epochDay: number): number {
+  return ((((epochDay % 7) + 7) % 7) + 3) % 7;
+}
+
+/**
+ * Fixed-week rollup for a variant: buckets in the current Monday→Sunday week
+ * (the week containing `todayKey`). The window resets every Monday — see
+ * `msUntilWeeklyReset` for the exact instant. Pure; the SCREEN passes the local
+ * dayKey. (The reset *instant* is UTC-anchored so it's identical worldwide; the
+ * day buckets are local, which only matters in the boundary hours.)
  */
 export function weeklyRollup(vs: VariantStats, todayKey: string): Rollup {
   const today = epochDayFromKey(todayKey);
-  const from = today - 6;
+  const from = today - mondayDow(today); // this week's Monday
   const inWindow = Object.entries(vs.days)
     .filter(([key]) => {
       const e = epochDayFromKey(key);
@@ -246,6 +259,23 @@ export function weeklyRollup(vs: VariantStats, todayKey: string): Rollup {
     })
     .map(([, b]) => b);
   return rollup(inWindow);
+}
+
+/**
+ * Milliseconds until the weekly window resets — the next Monday 00:00:00 UTC.
+ * UTC-anchored on purpose: every player's week turns over at the same instant
+ * regardless of timezone. Always in (0, 7 days].
+ */
+export function msUntilWeeklyReset(nowMs: number): number {
+  const dayIndex = Math.floor(nowMs / DAY_MS); // whole UTC days since epoch
+  const nextResetDay = dayIndex - mondayDow(dayIndex) + 7;
+  return nextResetDay * DAY_MS - nowMs;
+}
+
+/** Split a duration (ms) into whole days + leftover whole hours, for "Xd Yh". */
+export function daysAndHours(ms: number): { days: number; hours: number } {
+  const t = Math.max(0, ms);
+  return { days: Math.floor(t / DAY_MS), hours: Math.floor((t % DAY_MS) / HOUR_MS) };
 }
 
 /**

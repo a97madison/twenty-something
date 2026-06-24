@@ -3,9 +3,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Variant } from "@twenty-something/core";
 import { colors, fonts, radius, Tappable } from "@twenty-something/ui";
 
-import { VARIANTS, allTimeRollup, weeklyRollup, type AllStats, type Rollup } from "../logic";
+import { VARIANTS, allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type Rollup } from "../logic";
 import { RatingStars } from "./RatingStars";
-import { formatAccuracy, formatRating, formatSolve, variantLabel } from "./format";
+import { formatAccuracy, formatCloses, formatRating, formatSolve, variantLabel } from "./format";
 
 /** Lifetime hands before the all-time rating unlocks. */
 const ALLTIME_GATE = 10;
@@ -28,14 +28,14 @@ export function StatsScreen({ stats, dayKey, onBack }: Props) {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Stats</Text>
         {VARIANTS.map((v) => (
-          <VariantCard key={v} variant={v} stats={stats} dayKey={dayKey} />
+          <VariantCard key={v} variant={v} stats={stats} dayKey={dayKey} weekCloses={formatCloses(msUntilWeeklyReset(Date.now()))} />
         ))}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function VariantCard({ variant, stats, dayKey }: { variant: Variant; stats: AllStats; dayKey: string }) {
+function VariantCard({ variant, stats, dayKey, weekCloses }: { variant: Variant; stats: AllStats; dayKey: string; weekCloses: string }) {
   const vs = stats[variant];
   const allTime = allTimeRollup(vs);
   const weekly = weeklyRollup(vs, dayKey);
@@ -52,7 +52,7 @@ function VariantCard({ variant, stats, dayKey }: { variant: Variant; stats: AllS
       />
       <View style={styles.hr} />
       <Window
-        label="THIS WEEK"
+        label={`THIS WEEK (${weekCloses})`}
         rollup={weekly}
         ratingGated={weekly.count < WEEKLY_GATE}
         gateMsg="Not enough hands this week yet"

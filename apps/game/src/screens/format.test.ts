@@ -13,6 +13,9 @@ import {
   wrongFeedbackText,
   formatRating,
   formatAccuracy,
+  formatCloses,
+  msUntilLocalMidnight,
+  formatHoursMinutes,
 } from "./format.ts";
 
 test("variantLabel", () => {
@@ -64,6 +67,24 @@ test("wrongFeedbackText reports the wrong value", () => {
   };
   assert.match(wrongFeedbackText("wrong_value", expr, 24), /makes 12, not 24/);
   assert.match(wrongFeedbackText("wrong_cards", expr, 24), /each of the four cards/);
+});
+
+test("formatCloses renders Xd Yh", () => {
+  assert.equal(formatCloses(2 * 86_400_000 + 5 * 3_600_000), "Closes in 2d 5h");
+  assert.equal(formatCloses(0), "Closes in 0d 0h");
+  assert.equal(formatCloses(-100), "Closes in 0d 0h");
+});
+
+test("msUntilLocalMidnight counts to the next local midnight", () => {
+  // 2026-06-24 22:30 local → 1h30m until 2026-06-25 00:00 local.
+  assert.equal(msUntilLocalMidnight(new Date(2026, 5, 24, 22, 30, 0)), 90 * 60_000);
+  // Just after midnight → almost a full day.
+  assert.equal(msUntilLocalMidnight(new Date(2026, 5, 24, 0, 0, 0)), 86_400_000);
+});
+
+test("formatHoursMinutes renders Xh Ym", () => {
+  assert.equal(formatHoursMinutes(5 * 3_600_000 + 12 * 60_000), "5h 12m");
+  assert.equal(formatHoursMinutes(0), "0h 0m");
 });
 
 test("formatRating / formatAccuracy handle null", () => {

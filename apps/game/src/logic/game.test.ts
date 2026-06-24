@@ -20,6 +20,8 @@ import {
   handsTotal,
   allTimeRollup,
   weeklyRollup,
+  msUntilWeeklyReset,
+  daysAndHours,
   emptyStats,
   starScore,
   type DealtHand,
@@ -156,13 +158,30 @@ test("a bounded session ends after every hand is decided", () => {
   assert.equal(b.state.session.correct, 2);
 });
 
-test("weekly rollup only counts buckets within the trailing 7 days", () => {
+test("weekly rollup counts only the current Monday→Sunday week", () => {
   const g = newGame("24", [SOLVABLE()], { now: 0, stats: emptyStats() });
-  const out = submitSolution(g, solveExpr(SOLVABLE()), 5000, "2026-06-24");
+  const out = submitSolution(g, solveExpr(SOLVABLE()), 5000, "2026-06-24"); // a Wednesday
   assert.ok(out.solved);
   if (!out.solved) return;
   const vs = out.state.stats["24"];
-  assert.equal(weeklyRollup(vs, "2026-06-24").count, 1); // same day → in window
-  assert.equal(weeklyRollup(vs, "2026-06-30").count, 1); // 6 days later → still in window
-  assert.equal(weeklyRollup(vs, "2026-07-01").count, 0); // 7 days later → out of window
+  // Hand sits in the week Mon 2026-06-22 … Sun 2026-06-28; the window is
+  // [this week's Monday, the query day].
+  assert.equal(weeklyRollup(vs, "2026-06-24").count, 1); // same day
+  assert.equal(weeklyRollup(vs, "2026-06-28").count, 1); // Sunday (week end) → still counts
+  assert.equal(weeklyRollup(vs, "2026-06-29").count, 0); // next Monday → week reset, drops out
+});
+
+test("weekly reset counts down to the next Monday 00:00 UTC, worldwide", () => {
+  const DAY_MS = 86_400_000, HOUR_MS = 3_600_000;
+  const monday = Date.UTC(2026, 5, 22, 0, 0, 0); // 2026-06-22 is a Monday
+  assert.equal(msUntilWeeklyReset(monday), 7 * DAY_MS); // just reset → a full week left
+  assert.equal(msUntilWeeklyReset(monday + HOUR_MS), 7 * DAY_MS - HOUR_MS);
+  const sundayLate = Date.UTC(2026, 5, 28, 23, 0, 0); // Sunday 23:00 UTC
+  assert.equal(msUntilWeeklyReset(sundayLate), HOUR_MS); // 1h until Monday
+});
+
+test("daysAndHours splits a duration and floors negatives to zero", () => {
+  assert.deepEqual(daysAndHours(2 * 86_400_000 + 5 * 3_600_000 + 999), { days: 2, hours: 5 });
+  assert.deepEqual(daysAndHours(0), { days: 0, hours: 0 });
+  assert.deepEqual(daysAndHours(-1000), { days: 0, hours: 0 });
 });

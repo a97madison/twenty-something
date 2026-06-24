@@ -74,3 +74,29 @@ export function formatRating(r: number | null): string {
 export function formatAccuracy(a: number | null): string {
   return a === null ? "—" : `${Math.round(a * 100)}%`;
 }
+
+/** "Closes in 2d 5h" from a millisecond duration until the weekly reset. */
+export function formatCloses(ms: number): string {
+  const t = Math.max(0, ms);
+  const days = Math.floor(t / 86_400_000);
+  const hours = Math.floor((t % 86_400_000) / 3_600_000);
+  return `Closes in ${days}d ${hours}h`;
+}
+
+/**
+ * Milliseconds until the next LOCAL midnight — when the daily challenge resets
+ * for this user (each user's own midnight, by design). Computed at the screen
+ * boundary because it reads the device's local calendar.
+ */
+export function msUntilLocalMidnight(d: Date = new Date()): number {
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
+  return next.getTime() - d.getTime();
+}
+
+/** "5h 12m" from a sub-day millisecond duration (the daily countdown). */
+export function formatHoursMinutes(ms: number): string {
+  const t = Math.max(0, ms);
+  const h = Math.floor(t / 3_600_000);
+  const m = Math.floor((t % 3_600_000) / 60_000);
+  return `${h}h ${m}m`;
+}

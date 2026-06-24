@@ -2,6 +2,8 @@ import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, fonts, radius, Tappable } from "@twenty-something/ui";
 
+import { formatHoursMinutes, msUntilLocalMidnight } from "./format";
+
 interface Props {
   onPlay: () => void;
   onDaily: () => void;
@@ -35,7 +37,7 @@ export function HomeScreen({ onPlay, onDaily, onStats, onInstructions, dailyDone
           disabled={dailyDone}
         >
           <Text style={styles.secondaryText}>Daily challenge</Text>
-          {dailyDone && <Text style={styles.dailySub}>Played today · try again tomorrow</Text>}
+          {dailyDone && <Text style={styles.dailySub}>Next challenge in {formatHoursMinutes(msUntilLocalMidnight())}</Text>}
         </Tappable>
         <Tappable style={[styles.btn, styles.secondary]} onPress={onStats}>
           <Text style={styles.secondaryText}>Stats</Text>
