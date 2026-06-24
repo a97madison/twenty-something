@@ -58,9 +58,14 @@ function VariantCard({ variant, stats, dayKey }: { variant: Variant; stats: AllS
         gateMsg="Not enough hands this week yet"
       />
 
-      <Text style={styles.records}>
-        best streak {vs.bestStreak} · best time {vs.bestTimeMs === null ? "—" : formatSolve(vs.bestTimeMs)}
-      </Text>
+      <View style={styles.hr} />
+      <View style={styles.window}>
+        <Text style={styles.windowLabel}>RECORDS</Text>
+        <View style={styles.metaRow}>
+          <Meta label="Best streak" value={String(vs.bestStreak)} />
+          <Meta label="Best time" value={vs.bestTimeMs === null ? "—" : formatSolve(vs.bestTimeMs)} />
+        </View>
+      </View>
     </View>
   );
 }
@@ -115,5 +120,4 @@ const styles = StyleSheet.create({
   metaValue: { fontFamily: fonts.serifBold, fontSize: 18, color: colors.ink },
   metaLabel: { fontFamily: fonts.sans, fontSize: 10, letterSpacing: 0.8, color: colors.inkFaint, marginTop: 2 },
   hr: { height: 1, backgroundColor: colors.line, marginVertical: 16 },
-  records: { fontFamily: fonts.sans, fontSize: 12, color: colors.inkFaint, marginTop: 16, textAlign: "center" },
 });
