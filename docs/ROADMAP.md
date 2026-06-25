@@ -30,7 +30,7 @@ Everyone playing the same date gets the **same hands**. `dealDailyHands(variant,
 
 This is the keystone that makes the percentile possible: since the server can regenerate the exact same puzzle from the date, it never trusts client-sent cards.
 
-## 3. Daily percentile — BLOCKED on Firebase deploy
+## 3. Daily percentile — ✅ LIVE
 
 > "On completion, show what percentile they got vs everyone else who did the daily."
 
@@ -51,6 +51,33 @@ The **logic already exists** in `functions/` (`submitDaily`, `computePercentile`
 **Still yours (account-gated):** `firebase login`, create the `twenty-something-dev` project, **enable Blaze billing** (2nd-gen functions require it), then `firebase deploy --only firestore:rules,functions`.
 
 **Verified locally (done):** `npm run test:emulator` boots auth+firestore+functions on a `demo-ts` project (no login/billing) and runs `functions/integration/percentile.test.mjs` — **5/5 e2e assertions pass**: the bundled-core artifact loads in the real Firebase runtime, `submitDailyGameResult` enforces auth, a rating of 3 in a field of 5 returns the 60th percentile (mid-rank), the score locks on first submit (anti-fishing), and the two variant fields stay isolated. So the backend is proven correct and deployable — deploy is now purely your login/billing step.
+
+### Security model + App Check (pre-launch hardening)
+
+The deployed callables are **public at the IAM layer on purpose** (consumer
+devices have no Google IAM credentials — a Firebase anon token isn't one), with
+auth enforced *inside* each function (`requireUid`) and Firestore default-deny so
+the DB is never client-reachable. That's the standard, safe Firebase model: no
+data exposure. The only residual risk is **abuse** — anyone can mint a free
+anonymous token and POST junk daily ratings to skew the casual percentile, or
+spam the endpoint for invocation cost.
+
+**App Check** is the fix (verifies a call came from your genuine app binary), but
+it's a **milestone, not a toggle** — do NOT enable enforcement before the client
+can mint tokens or every real call 401s:
+1. **Client provider** needs a real build: iOS **App Attest** (Apple Developer app
+   registration) / Android **Play Integrity** (Play Console) — neither works in
+   Expo Go; both need an **EAS dev/prod build**. Web (if shipped) = reCAPTCHA
+   Enterprise. Dev = the debug provider + a registered debug token.
+2. **Client SDK**: App Check on RN means adopting the Firebase JS SDK (or
+   @react-native-firebase) — heavier than the current zero-dep REST callable.
+   Bundle this with the EAS build work (needed for the App Store + App Attest anyway).
+3. **Server**: add `enforceAppCheck: true` to the `onCall` options (one line each).
+4. **Rollout**: register app → run **UNENFORCED** (monitor metrics ~1–2 weeks to
+   confirm real traffic passes) → *then* flip enforcement.
+
+Until then: keep the budget alert on, accept that the percentile is a casual
+(gameable) leaderboard, and ship. App Check lands with the dev-build milestone.
 
 ## 4. Notifications — BLOCKED on a dev build (logic ready)
 
@@ -103,7 +130,8 @@ Highest-ROI next additions, in order:
 | **Daily share button (outcome-only)** | ✅ shipped, tested |
 | **Functions deploy bundling (monorepo trap)** | ✅ fixed, verified |
 | **Percentile backend (emulator-verified)** | ✅ 5/5 e2e passing vs live emulator (`npm run test:emulator`) |
-| Daily percentile (production) | ⛔ only needs your `firebase login` + Blaze + `firebase deploy` |
+| **Daily percentile (production)** | ✅ **LIVE** — deployed us-central1/node22, client wired (zero-dep REST), verified e2e vs prod |
 | Notifications — scheduling brain | ✅ `planNotifications` built + tested (streak-risk / nudge / weekly) |
 | Notifications — OS delivery | ⛔ needs `expo-notifications` + a dev build to verify firing |
+| App Check (abuse hardening) | ⛔ needs the EAS dev build (App Attest / Play Integrity) — see §3 |
 | Store distribution | ⏳ needs EAS + store accounts |

@@ -1,9 +1,13 @@
+import { useEffect, useState } from "react";
 import { Share, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { buildDailyShareText, type Variant } from "@twenty-something/core";
 import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
 import { allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type GameState } from "../logic";
+import { storage } from "../storage";
+import { BACKEND_ENABLED } from "../backend/config";
+import { submitDailyResult, type DailyPercentile } from "../backend/daily";
 import { RatingStars } from "./RatingStars";
 import { formatAccuracy, formatCloses, formatRating, formatSolve, variantLabel } from "./format";
 
@@ -39,6 +43,18 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
   const weeklyUnlocked = weekly.count >= WEEKLY_GATE;
   const delta = prevRollup.rating !== null && newRollup.rating !== null ? newRollup.rating - prevRollup.rating : null;
 
+  // Daily only: submit this game's rating, get the live field percentile back.
+  const live = mode === "daily" && BACKEND_ENABLED && sessionRating !== null;
+  const [pct, setPct] = useState<DailyPercentile | null | "loading">(live ? "loading" : null);
+  useEffect(() => {
+    if (!live) return;
+    let alive = true;
+    submitDailyResult(storage, dayKey, variant, sessionRating!).then((r) => alive && setPct(r));
+    return () => {
+      alive = false;
+    };
+  }, []); // run once when the daily summary mounts
+
   // Outcome-only daily share (never reveals a method) — built by core.
   const onShare = () => {
     const message = buildDailyShareText({
@@ -73,7 +89,17 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
 
         {mode === "daily" && (
           <View style={styles.percentile}>
-            <Text style={styles.percentileText}>Percentile vs today's players — coming with the online update.</Text>
+            {pct === "loading" ? (
+              <Text style={styles.percentileText}>Ranking you against today's players…</Text>
+            ) : pct === null ? (
+              <Text style={styles.percentileText}>Couldn't reach the leaderboard — you're offline.</Text>
+            ) : pct.fieldSize <= 1 ? (
+              <Text style={styles.percentileBig}>🏁 First to finish today's challenge</Text>
+            ) : (
+              <Text style={styles.percentileBig}>
+                🏅 You beat {pct.percentile}% of today's {pct.fieldSize} players
+              </Text>
+            )}
           </View>
         )}
 
@@ -150,6 +176,7 @@ const styles = StyleSheet.create({
   cellValue: { fontFamily: fonts.serifBold, fontSize: 20, color: colors.ink, marginTop: 3 },
   percentile: { marginTop: 14, padding: 12, borderRadius: radius.md, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.line },
   percentileText: { fontFamily: fonts.sans, fontSize: 12, color: colors.inkDim, textAlign: "center" },
+  percentileBig: { fontFamily: fonts.serifBold, fontSize: 15, color: colors.accent, textAlign: "center" },
   section: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.4, color: colors.inkFaint, marginTop: 26, marginBottom: 10 },
   deltaRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   deltaPrev: { fontFamily: fonts.serif, fontSize: 22, color: colors.inkDim }, // dimmed prior rating — regular weight
