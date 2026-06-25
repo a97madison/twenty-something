@@ -71,7 +71,7 @@ interface Props {
   variant: Variant;
   hands: DealtHand[];
   initialStats: AllStats;
-  mode: "practice" | "daily";
+  mode: "practice" | "daily" | "challenge";
   /** Called once the bounded session is over, with the final engine state. */
   onDone: (finalState: GameState) => void;
   /** Persist updated stats after each committed decision. */
