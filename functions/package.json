@@ -6,13 +6,13 @@
   "type": "module",
   "main": "lib/index.js",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "scripts": {
     "pretest": "npm run build -w @twenty-something/core",
     "test": "node --test --experimental-strip-types src/logic.test.ts src/daily.test.ts",
     "typecheck": "tsc --noEmit",
-    "build:deploy": "npm run build -w @twenty-something/core && esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --external:firebase-admin --external:firebase-admin/* --external:firebase-functions --external:firebase-functions/* --outfile=lib/index.js"
+    "build:deploy": "npm run build -w @twenty-something/core && esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --external:firebase-admin --external:firebase-admin/* --external:firebase-functions --external:firebase-functions/* --outfile=lib/index.js"
   },
   "dependencies": {
     "firebase-admin": "^13.10.0",
