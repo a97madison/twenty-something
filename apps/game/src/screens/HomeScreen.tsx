@@ -7,14 +7,15 @@ import { formatHoursMinutes, msUntilLocalMidnight } from "./format";
 interface Props {
   onPlay: () => void;
   onDaily: () => void;
+  onChallenge: () => void;
   onStats: () => void;
   onInstructions: () => void;
   /** True once today's daily has been played — locks the Daily button. */
   dailyDone?: boolean;
 }
 
-/** Landing screen: brand, the three entry points, and the "i" → Instructions. */
-export function HomeScreen({ onPlay, onDaily, onStats, onInstructions, dailyDone }: Props) {
+/** Landing screen: brand, the entry points, and the "i" → Instructions. */
+export function HomeScreen({ onPlay, onDaily, onChallenge, onStats, onInstructions, dailyDone }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <Tappable style={styles.info} onPress={onInstructions} hitSlop={12} accessibilityLabel="How to play">
@@ -38,6 +39,9 @@ export function HomeScreen({ onPlay, onDaily, onStats, onInstructions, dailyDone
         >
           <Text style={styles.secondaryText}>Daily challenge</Text>
           {dailyDone && <Text style={styles.dailySub}>Next challenge in {formatHoursMinutes(msUntilLocalMidnight())}</Text>}
+        </Tappable>
+        <Tappable style={[styles.btn, styles.secondary]} onPress={onChallenge}>
+          <Text style={styles.secondaryText}>Play a friend</Text>
         </Tappable>
         <Tappable style={[styles.btn, styles.secondary]} onPress={onStats}>
           <Text style={styles.secondaryText}>Stats</Text>

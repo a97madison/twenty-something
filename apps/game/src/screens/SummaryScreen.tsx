@@ -4,7 +4,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { buildDailyShareText, type Variant } from "@twenty-something/core";
 import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
-import { allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type GameState } from "../logic";
+import {
+  allTimeRollup,
+  weeklyRollup,
+  msUntilWeeklyReset,
+  encodeChallenge,
+  challengeOutcome,
+  type AllStats,
+  type GameState,
+} from "../logic";
 import { storage } from "../storage";
 import { BACKEND_ENABLED } from "../backend/config";
 import { submitDailyResult, type DailyPercentile } from "../backend/daily";
@@ -16,20 +24,31 @@ const ALLTIME_GATE = 10;
 /** Hands this week before the weekly rating unlocks. */
 const WEEKLY_GATE = 5;
 
+/** Friend-challenge context carried into the summary (see App.tsx). */
+interface ChallengeContext {
+  role: "create" | "accept";
+  seed: string;
+  hands: number;
+  myName?: string;
+  challenger?: { name: string; rating: number };
+}
+
 interface Props {
   variant: Variant;
-  mode: "practice" | "daily";
+  mode: "practice" | "daily" | "challenge";
   /** Stats as they were BEFORE this session (for the previous→new delta). */
   previousStats: AllStats;
   /** Final engine state after the session (stats already include it). */
   finalState: GameState;
   dayKey: string;
+  /** Present only for friend challenges — drives the head-to-head / share-code. */
+  challenge?: ChallengeContext;
   onPlayAgain: () => void;
   onHome: () => void;
 }
 
 /** End-of-game summary: this session's results plus the all-time / weekly rating block. */
-export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey, onPlayAgain, onHome }: Props) {
+export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey, challenge, onPlayAgain, onHome }: Props) {
   const s = finalState.session;
   const sessionRating = s.total === 0 ? null : s.starSum / s.total;
   const sessionAccuracy = s.total === 0 ? null : s.correct / s.total;
@@ -69,10 +88,45 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
     Share.share({ message }).catch(() => {});
   };
 
+  // --- Friend challenge --------------------------------------------------------
+  const isCreate = challenge?.role === "create";
+  const isAccept = challenge?.role === "accept" && challenge.challenger != null;
+
+  // Accept: head-to-head verdict vs the challenger who sent the code.
+  const challenger = challenge?.challenger;
+  const versus = isAccept && sessionRating !== null ? challengeOutcome(sessionRating, challenger!.rating) : null;
+  const rivalName = (challenger?.name || "").trim() || "your friend";
+
+  // Create: the shareable code carrying this game's seed + rating, plus a friendly invite.
+  const onShareChallenge = () => {
+    if (!isCreate || sessionRating === null) return;
+    const code = encodeChallenge({
+      seed: challenge!.seed,
+      variant,
+      hands: challenge!.hands,
+      rating: sessionRating,
+      name: challenge!.myName ?? "",
+    });
+    const message = [
+      `I scored ${sessionRating.toFixed(1)}★ on a ${variantLabel(variant)} challenge — same ${challenge!.hands} hands. Can you beat me?`,
+      `Open 20·Something → Play a friend → Enter a code:`,
+      code,
+    ].join("\n");
+    Share.share({ message }).catch(() => {});
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.kicker}>{mode === "daily" ? "Daily challenge" : variantLabel(variant)}</Text>
+        <Text style={styles.kicker}>
+          {mode === "daily"
+            ? "Daily challenge"
+            : mode === "challenge"
+              ? isCreate
+                ? "Friend challenge"
+                : `${rivalName}'s challenge`
+              : variantLabel(variant)}
+        </Text>
 
         {/* Headline: this game's rating. */}
         <View style={styles.headline}>
@@ -86,6 +140,29 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
           <Cell label="ACCURACY" value={formatAccuracy(sessionAccuracy)} />
           <Cell label="AVG TIME" value={sessionAvg === null ? "—" : formatSolve(sessionAvg)} />
         </View>
+
+        {versus && (
+          <View style={[styles.versus, versus.result === "win" ? styles.versusWin : versus.result === "loss" ? styles.versusLoss : styles.versusTie]}>
+            <Text style={styles.versusVerdict}>
+              {versus.result === "win"
+                ? `🏆 You beat ${rivalName}`
+                : versus.result === "loss"
+                  ? `😤 ${rivalName} beat you`
+                  : `🤝 Dead even with ${rivalName}`}
+            </Text>
+            <Text style={styles.versusLine}>
+              You {sessionRating!.toFixed(1)}★ · {rivalName} {challenger!.rating.toFixed(1)}★
+              {versus.result !== "tie" ? `  (by ${versus.diff.toFixed(1)})` : ""}
+            </Text>
+          </View>
+        )}
+
+        {isCreate && (
+          <View style={styles.versus}>
+            <Text style={styles.versusVerdict}>📨 Challenge ready</Text>
+            <Text style={styles.versusLine}>Share the code below so a friend can play these same {challenge!.hands} hands.</Text>
+          </View>
+        )}
 
         {mode === "daily" && (
           <View style={styles.percentile}>
@@ -138,13 +215,17 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
             <Tappable style={[styles.btn, styles.primary]} onPress={onShare}>
               <Text style={styles.primaryText}>Share result</Text>
             </Tappable>
-          ) : (
+          ) : isCreate ? (
+            <Tappable style={[styles.btn, styles.primary]} onPress={onShareChallenge}>
+              <Text style={styles.primaryText}>Share challenge code</Text>
+            </Tappable>
+          ) : mode === "challenge" ? null : (
             <Tappable style={[styles.btn, styles.primary]} onPress={onPlayAgain}>
               <Text style={styles.primaryText}>Play again</Text>
             </Tappable>
           )}
-          <Tappable style={[styles.btn, styles.secondary]} onPress={onHome}>
-            <Text style={styles.secondaryText}>Back to home</Text>
+          <Tappable style={[styles.btn, mode === "challenge" && !isCreate ? styles.primary : styles.secondary]} onPress={onHome}>
+            <Text style={mode === "challenge" && !isCreate ? styles.primaryText : styles.secondaryText}>Back to home</Text>
           </Tappable>
           {mode === "daily" && <Text style={styles.tomorrow}>Try again tomorrow</Text>}
         </View>
@@ -174,6 +255,12 @@ const styles = StyleSheet.create({
   cell: { flex: 1, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingVertical: 12, alignItems: "center", ...shadows.soft },
   cellLabel: { fontFamily: fonts.sans, fontSize: 10, letterSpacing: 1, color: colors.inkFaint },
   cellValue: { fontFamily: fonts.serifBold, fontSize: 20, color: colors.ink, marginTop: 3 },
+  versus: { marginTop: 14, padding: 14, borderRadius: radius.md, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.line, alignItems: "center", gap: 4 },
+  versusWin: { borderColor: colors.good },
+  versusLoss: { borderColor: colors.bad },
+  versusTie: { borderColor: colors.line2 },
+  versusVerdict: { fontFamily: fonts.serifBold, fontSize: 17, color: colors.ink, textAlign: "center" },
+  versusLine: { fontFamily: fonts.sans, fontSize: 13, color: colors.inkDim, textAlign: "center" },
   percentile: { marginTop: 14, padding: 12, borderRadius: radius.md, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.line },
   percentileText: { fontFamily: fonts.sans, fontSize: 12, color: colors.inkDim, textAlign: "center" },
   percentileBig: { fontFamily: fonts.serifBold, fontSize: 15, color: colors.accent, textAlign: "center" },

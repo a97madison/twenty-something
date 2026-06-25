@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { isSolvable, computeTarget, CLASSIC_OPERATIONS } from "@twenty-something/core";
-import { dealHand, dealHands, dealDailyHands, epochDayFromKey } from "./engine.ts";
+import { dealHand, dealHands, dealDailyHands, dealSeededHands, epochDayFromKey } from "./engine.ts";
 
 // Deterministic PRNG so "random" deals are reproducible in tests.
 function mulberry32(seed: number): () => number {
@@ -80,6 +80,16 @@ test("daily deal differs across dates and across variants", () => {
     d1.map((h) => h.values),
     v.map((h) => h.values),
   );
+});
+
+test("seeded deal is deterministic and seed-sensitive; daily is one of its seeds", () => {
+  assert.deepEqual(dealSeededHands("abc123", "24", 5), dealSeededHands("abc123", "24", 5));
+  assert.notDeepEqual(
+    dealSeededHands("abc123", "24", 5).map((h) => h.values),
+    dealSeededHands("xyz789", "24", 5).map((h) => h.values),
+  );
+  // dealDailyHands is just dealSeededHands keyed by the date.
+  assert.deepEqual(dealDailyHands("24", "2026-06-24", 5), dealSeededHands("2026-06-24", "24", 5));
 });
 
 test("epochDayFromKey: consecutive days differ by 1, across a month boundary", () => {

@@ -114,6 +114,18 @@ function hashSeed(s: string): number {
 export const DAILY_HANDS = 5;
 
 /**
+ * Deal `n` hands deterministically from a free-form `seed` string: the same
+ * (seed, variant, n) always yields the SAME hands. This is the shared-deal
+ * primitive behind both the daily challenge (seed = the date) and head-to-head
+ * friend challenges (seed = a random code), so two players who use the same seed
+ * judge the exact same cards — offline, no backend.
+ */
+export function dealSeededHands(seed: string, variant: Variant, n: number): DealtHand[] {
+  const rng = mulberry32(hashSeed(`${seed}|${variant}`));
+  return Array.from({ length: n }, () => dealHand(variant, rng));
+}
+
+/**
  * The shared daily challenge: everyone who plays `dateKey` + `variant` gets the
  * SAME `n` hands, generated from a date seed. Fully offline and deterministic —
  * no backend needed for the hands themselves (only the percentile is server-side).
@@ -123,8 +135,7 @@ export function dealDailyHands(
   dateKey: string,
   n: number = DAILY_HANDS,
 ): DealtHand[] {
-  const rng = mulberry32(hashSeed(`${dateKey}|${variant}`));
-  return Array.from({ length: n }, () => dealHand(variant, rng));
+  return dealSeededHands(dateKey, variant, n);
 }
 
 // ---------------------------------------------------------------------------
