@@ -9,7 +9,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --test --experimental-strip-types src/*.test.ts src/logic/*.test.ts src/screens/*.test.ts",
+    "test": "node --test --experimental-strip-types src/*.test.ts src/logic/*.test.ts src/screens/*.test.ts src/backend/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

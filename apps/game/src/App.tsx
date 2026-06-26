@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Linking, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -45,6 +45,7 @@ import {
 } from "./logic";
 import { storage } from "./storage";
 import { track, setAnalyticsSink, Events } from "./analytics";
+import { createPostHogSink } from "./backend/analytics";
 import { localDayKey } from "./screens/format";
 import { HomeScreen } from "./screens/HomeScreen";
 import { SetupScreen } from "./screens/SetupScreen";
@@ -121,6 +122,9 @@ export default function App() {
   // This device's stable player id + the head-to-head record vs each friend.
   const [playerId, setPlayerId] = useState<string>("");
   const [rivals, setRivals] = useState<Rivals>(() => emptyRivals());
+  // Live mirror of playerId for the analytics distinct_id (read at flush time).
+  const playerIdRef = useRef(playerId);
+  playerIdRef.current = playerId;
   // Which pane the challenge screen opens on ("create" when coming from a rematch).
   const [challengeInitial, setChallengeInitial] = useState<"hub" | "create">("hub");
   // User preferences (haptics/sound/notification toggles).
@@ -129,11 +133,11 @@ export default function App() {
   // Load saved stats + daily-done marker + remembered name once on mount.
   useEffect(() => {
     let alive = true;
-    // Dev: log events to the console; prod stays a no-op until a real sink (an
-    // analytics SDK) is installed here at the dev-build step.
-    if (typeof __DEV__ !== "undefined" && __DEV__) {
-      setAnalyticsSink((e, p) => console.log("📊", e, p));
-    }
+    // Real analytics sink when keyed (PostHog REST); dev console otherwise; prod
+    // with no key stays a silent no-op. Installed before app_open so it's caught.
+    const phSink = createPostHogSink(() => playerIdRef.current);
+    if (phSink) setAnalyticsSink(phSink);
+    else if (typeof __DEV__ !== "undefined" && __DEV__) setAnalyticsSink((e, p) => console.log("📊", e, p));
     track(Events.AppOpen);
     loadStats(storage).then((s) => {
       if (alive) setStats(s);
