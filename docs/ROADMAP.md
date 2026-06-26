@@ -185,7 +185,7 @@ Still open in stage 4 (not yet built): **crash reporting**, store legal/assets.
 - **Analytics sink — DONE.** Zero-dep PostHog REST capture (`backend/analytics.ts`,
   micro-batch → /batch/), installed with the device id as distinct_id. Flip
   `ANALYTICS_ENABLED` + paste a PostHog key in `backend/config.ts` to light it up.
-- **Live rooms — BACKEND DONE, client UI is the remaining piece.** New callables
+- **Live rooms — DEPLOYED & LIVE (backend + client).** New callables
   `createRoom` / `joinRoom` / `dealRoomRound` (host-only, server-side
   GUARANTEED-solvable deal via core's solver) / `getRoomState` (poll for live
   state — clients can't read default-deny room docs). `submitRoomSolution` scores
@@ -195,11 +195,15 @@ Still open in stage 4 (not yet built): **crash reporting**, store legal/assets.
   **Client BUILT** (`screens/RoomsScreen.tsx`, Home → "Live rooms"): create/join
   by code → lobby → race (CalcPad wired to submitRoomSolution, live scoreboard) →
   match over, syncing by polling getRoomState every 1.5s. backend/rooms.ts is the
-  auth'd REST client. Typecheck + bundle + web smoke (entry renders, graceful
-  offline) — but the LIVE race is unverifiable until the 3 callables are deployed
-  with a public run.invoker. Rooms cards are always solvable so CalcPad's
-  No-solution/Pass keys are inert here (a pad variant can hide them later).
-- **Social push — BACKEND DONE, client token gated on the dev build.**
+  auth'd REST client. **DEPLOYED to prod with a public invoker
+  (`invoker:"public"` in code → `firebase deploy`, no gcloud) and verified LIVE**:
+  the API-level race returns exactly one winner against prod, and the browser
+  client creates a real room + reaches the lobby (test rooms cleaned up). All 8
+  client callables (rooms + push + daily) return 200 to an anon token. Rooms cards
+  are always solvable so CalcPad's No-solution/Pass keys are inert here (a pad
+  variant can hide them later). REMAINING client polish: a full 2-player race UI
+  pass + timers/rematch.
+- **Social push — BACKEND DEPLOYED + LIVE, client token gated on the dev build.**
   `registerPushToken` (keyed by the playerId the challenge code carries) +
   `reportChallengeResult` → Expo push from the challenger's POV ("😤 Sam beat your
   challenge — rematch?"). Pure copy/payload tested; **emulator e2e 4/4**. The
