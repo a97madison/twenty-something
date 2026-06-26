@@ -21,6 +21,8 @@ interface Props {
 
 /** Per-variant stats + the head-to-head record vs each friend. */
 export function StatsScreen({ stats, rivals, dayKey, onBack }: Props) {
+  const totalHands = VARIANTS.reduce((sum, v) => sum + allTimeRollup(stats[v]).count, 0);
+  const fresh = totalHands === 0 && Object.keys(rivals).length === 0;
   return (
     <SafeAreaView style={styles.safe}>
       <Tappable style={styles.back} onPress={onBack} hitSlop={12} accessibilityLabel="Back">
@@ -28,10 +30,20 @@ export function StatsScreen({ stats, rivals, dayKey, onBack }: Props) {
       </Tappable>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Stats</Text>
-        {VARIANTS.map((v) => (
-          <VariantCard key={v} variant={v} stats={stats} dayKey={dayKey} weekCloses={formatCloses(msUntilWeeklyReset(Date.now()))} />
-        ))}
-        <RivalsCard rivals={rivals} />
+        {fresh ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyGlyph}>📊</Text>
+            <Text style={styles.emptyTitle}>No games yet</Text>
+            <Text style={styles.emptyBody}>Play a hand or two and your accuracy, speed, rating, and rivals will show up here.</Text>
+          </View>
+        ) : (
+          <>
+            {VARIANTS.map((v) => (
+              <VariantCard key={v} variant={v} stats={stats} dayKey={dayKey} weekCloses={formatCloses(msUntilWeeklyReset(Date.now()))} />
+            ))}
+            <RivalsCard rivals={rivals} />
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -152,4 +164,8 @@ const styles = StyleSheet.create({
   rivalRecord: { fontFamily: fonts.serifBold, fontSize: 16, color: colors.inkDim },
   rivalUp: { color: colors.good },
   rivalDown: { color: colors.bad },
+  empty: { alignItems: "center", paddingTop: 80, paddingHorizontal: 12 },
+  emptyGlyph: { fontSize: 44, marginBottom: 16 },
+  emptyTitle: { fontFamily: fonts.serifBold, fontSize: 22, color: colors.ink, marginBottom: 8 },
+  emptyBody: { fontFamily: fonts.sans, fontSize: 14, color: colors.inkDim, textAlign: "center", lineHeight: 21 },
 });

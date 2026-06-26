@@ -72,6 +72,8 @@ interface ChallengeContext {
 /** AsyncStorage keys for the remembered name and this device's stable player id. */
 const NAME_KEY = "twenty-something:challenger-name";
 const PLAYER_ID_KEY = "twenty-something:player-id";
+/** Set once the first-run instructions have been shown. */
+const ONBOARDED_KEY = "twenty-something:onboarded";
 
 /** What it takes to (re)start a game: the variant, the dealt deck, and the mode. */
 interface GameConfig {
@@ -141,6 +143,13 @@ export default function App() {
     });
     loadPrefs(storage).then((p) => {
       if (alive) setPrefs(p);
+    });
+    // First launch → show the how-to once, then never auto-open it again.
+    storage.getItem(ONBOARDED_KEY).then((v) => {
+      if (alive && !v) {
+        setScreen("instructions");
+        storage.setItem(ONBOARDED_KEY, "1").catch(() => {});
+      }
     });
     // A stable per-device id for friend records — created once, then persisted.
     storage.getItem(PLAYER_ID_KEY).then((id) => {
