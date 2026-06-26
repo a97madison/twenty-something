@@ -19,6 +19,7 @@ import { storage } from "../storage";
 import { BACKEND_ENABLED } from "../backend/config";
 import { submitDailyResult, type DailyPercentile } from "../backend/daily";
 import { RatingStars } from "./RatingStars";
+import { ShareCard } from "./ShareCard";
 import { formatAccuracy, formatCloses, formatRating, formatSolve, variantLabel } from "./format";
 
 /** Lifetime hands before the all-time rating unlocks. */
@@ -268,6 +269,24 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
           </View>
         ) : (
           <Text style={styles.locked}>Not enough hands this week yet.</Text>
+        )}
+
+        {mode === "daily" && (
+          <>
+            <Text style={styles.section}>YOUR CARD</Text>
+            <ShareCard
+              data={{
+                date: dayKey,
+                rating: sessionRating,
+                solved: s.correct,
+                total: s.total,
+                totalTimeSec: s.timeSumCorrect > 0 ? Math.round(s.timeSumCorrect / 1000) : null,
+                accuracy: sessionAccuracy,
+                streak: dailyStreak?.current,
+                percentile: typeof pct === "object" && pct ? pct.percentile : null,
+              }}
+            />
+          </>
         )}
 
         <View style={styles.actions}>
