@@ -355,6 +355,49 @@ export const dealRoomRound = onCall<DealRoundInput>(async (request) => {
   };
 });
 
+interface RoomStateInput {
+  roomId?: unknown;
+}
+
+// The client can't read room docs directly (Firestore is default-deny), so it
+// polls this for live state: status, players + scores, and the current round
+// (cards + target — never a solution; submitRoomSolution stays the authority).
+export const getRoomState = onCall<RoomStateInput>(async (request) => {
+  requireUid(request.auth);
+  const roomId = typeof request.data.roomId === "string" ? request.data.roomId.toUpperCase() : "";
+  const roomRef = db.doc(`rooms/${roomId}`);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Room not found.");
+  const room = roomSnap.data() as RoomDoc;
+
+  const playersSnap = await roomRef.collection("players").get();
+  const players = playersSnap.docs.map((d) => ({ uid: d.id, score: (d.data().score as number) ?? 0 }));
+
+  const roundsSnap = await roomRef.collection("rounds").orderBy("roundNumber", "desc").limit(1).get();
+  const round = roundsSnap.empty
+    ? null
+    : (() => {
+        const r = roundsSnap.docs[0]!.data() as RoomRoundDoc;
+        return {
+          roundNumber: r.roundNumber,
+          cards: r.cards,
+          target: r.target,
+          status: r.status,
+          winnerId: r.winnerId,
+          endsAt: r.endsAt ? r.endsAt.toMillis() : null,
+        };
+      })();
+
+  return {
+    status: room.status,
+    variant: room.variant,
+    hostId: room.hostId,
+    winningScore: room.config?.winningScore ?? null,
+    players,
+    round,
+  };
+});
+
 // --------------------------------------------------------------------------
 // Social push — the only nudge that needs a server (no device knows when your
 // friend accepts your offline challenge). Register a token keyed by the stable

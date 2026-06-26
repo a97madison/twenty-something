@@ -58,6 +58,15 @@ const denied = await call("dealRoomRound", guest, { roomId: created.roomId, roun
 assert.ok(denied.error, "non-host deal must be rejected");
 ok("only the host can deal");
 
+// 3b. getRoomState reflects the live room: 2 players + the racing round (no solution leaked).
+const state = (await call("getRoomState", guest, { roomId: created.roomId })).result;
+assert.equal(state.status, "in_progress");
+assert.equal(state.players.length, 2);
+assert.equal(state.round.roundNumber, 1);
+assert.equal(state.round.status, "racing");
+assert.equal(state.round.cards.length, 4);
+ok("getRoomState returns players + the current round for polling");
+
 // 4. First valid solve wins; the second sees the round is over.
 const a = (await call("submitRoomSolution", host, { roomId: created.roomId, roundNumber: 1, expr: sol.expr })).result;
 const b = (await call("submitRoomSolution", guest, { roomId: created.roomId, roundNumber: 1, expr: sol.expr })).result;
@@ -67,4 +76,4 @@ assert.equal(a.won, true, "the first submitter wins");
 assert.equal(b.won, false, "the second submitter loses the race");
 ok("first valid solve wins; the second is too late (exactly one winner)");
 
-console.log(`\nROOMS INTEGRATION: ${passed}/5 assertions passed against the live emulator.`);
+console.log(`\nROOMS INTEGRATION: ${passed}/6 assertions passed against the live emulator.`);
