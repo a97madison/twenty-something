@@ -148,8 +148,9 @@ export function decodeChallenge(code: string): Challenge | null {
 // straight in the accept flow (in-browser on the web build; via the app's deep
 // link on native). The code rides in a `c=` query param so it works at any host.
 
-/** Brandable base for challenge links (point this at the deployed web app). */
-export const CHALLENGE_URL_BASE = "https://twentysomething.app";
+/** Base for challenge links — the live web build (Firebase Hosting). Swap for a
+ *  custom domain once one's connected. */
+export const CHALLENGE_URL_BASE = "https://twenty-something-anthonydm.web.app";
 
 /** Build a shareable challenge link from a code. */
 export function challengeUrl(code: string): string {
