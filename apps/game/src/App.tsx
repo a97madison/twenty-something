@@ -27,6 +27,9 @@ import {
   emptyRivals,
   randomPlayerId,
   challengeOutcome,
+  loadPrefs,
+  savePrefs,
+  defaultPrefs,
   emptyStats,
   DAILY_HANDS,
   type AllStats,
@@ -35,6 +38,7 @@ import {
   type DailyStreakEvent,
   type DealtHand,
   type GameState,
+  type Prefs,
   type Rivals,
 } from "./logic";
 import { storage } from "./storage";
@@ -46,8 +50,10 @@ import { GameScreen } from "./screens/GameScreen";
 import { SummaryScreen } from "./screens/SummaryScreen";
 import { StatsScreen } from "./screens/StatsScreen";
 import { InstructionsScreen } from "./screens/InstructionsScreen";
+import { SettingsScreen } from "./screens/SettingsScreen";
+import { PrivacyScreen } from "./screens/PrivacyScreen";
 
-type Screen = "home" | "setup" | "challenge" | "game" | "summary" | "stats" | "instructions";
+type Screen = "home" | "setup" | "challenge" | "game" | "summary" | "stats" | "instructions" | "settings" | "privacy";
 type Mode = "practice" | "daily" | "challenge";
 
 /** Everything a friend-challenge game needs beyond its dealt hands. */
@@ -112,6 +118,8 @@ export default function App() {
   const [rivals, setRivals] = useState<Rivals>(() => emptyRivals());
   // Which pane the challenge screen opens on ("create" when coming from a rematch).
   const [challengeInitial, setChallengeInitial] = useState<"hub" | "create">("hub");
+  // User preferences (haptics/sound/notification toggles).
+  const [prefs, setPrefs] = useState<Prefs>(() => defaultPrefs());
 
   // Load saved stats + daily-done marker + remembered name once on mount.
   useEffect(() => {
@@ -130,6 +138,9 @@ export default function App() {
     });
     loadRivals(storage).then((r) => {
       if (alive) setRivals(r);
+    });
+    loadPrefs(storage).then((p) => {
+      if (alive) setPrefs(p);
     });
     // A stable per-device id for friend records — created once, then persisted.
     storage.getItem(PLAYER_ID_KEY).then((id) => {
@@ -150,6 +161,26 @@ export default function App() {
   const persist = (s: AllStats) => {
     setStats(s);
     saveStats(storage, s).catch(() => {});
+  };
+
+  const changePrefs = (p: Prefs) => {
+    setPrefs(p);
+    savePrefs(storage, p).catch(() => {});
+  };
+
+  // Erase every on-device record and reset in-memory state to a fresh install.
+  const deleteAllData = () => {
+    storage.clear().catch(() => {});
+    setStats(emptyStats());
+    setDailyStreak(emptyDailyStreak());
+    setRivals(emptyRivals());
+    setDailyDoneKey(null);
+    setChallengerName("");
+    setPrefs(defaultPrefs());
+    const fresh = randomPlayerId();
+    setPlayerId(fresh);
+    storage.setItem(PLAYER_ID_KEY, fresh).catch(() => {});
+    setScreen("home");
   };
 
   const launch = (cfg: GameConfig) => {
@@ -264,6 +295,7 @@ export default function App() {
             }}
             onStats={() => setScreen("stats")}
             onInstructions={() => setScreen("instructions")}
+            onSettings={() => setScreen("settings")}
             dailyDone={isDailyDone(dailyDoneKey, localDayKey())}
             streak={dailyStreakStatus(dailyStreak, localDayKey())}
           />
@@ -285,6 +317,7 @@ export default function App() {
             hands={config.hands}
             initialStats={stats}
             mode={config.mode}
+            haptics={prefs.haptics}
             onDone={finishGame}
             onStats={persist}
             dayKey={localDayKey}
@@ -310,6 +343,16 @@ export default function App() {
         )}
         {screen === "stats" && <StatsScreen stats={stats} rivals={rivals} dayKey={localDayKey()} onBack={() => setScreen("home")} />}
         {screen === "instructions" && <InstructionsScreen onBack={() => setScreen("home")} />}
+        {screen === "settings" && (
+          <SettingsScreen
+            prefs={prefs}
+            onChange={changePrefs}
+            onDeleteData={deleteAllData}
+            onPrivacy={() => setScreen("privacy")}
+            onBack={() => setScreen("home")}
+          />
+        )}
+        {screen === "privacy" && <PrivacyScreen onBack={() => setScreen("settings")} />}
       </View>
     </SafeAreaProvider>
   );

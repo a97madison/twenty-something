@@ -76,6 +76,8 @@ interface Props {
   hands: DealtHand[];
   initialStats: AllStats;
   mode: "practice" | "daily" | "challenge";
+  /** When false, suppress all haptic feedback (Settings toggle). */
+  haptics?: boolean;
   /** Called once the bounded session is over, with the final engine state. */
   onDone: (finalState: GameState) => void;
   /** Persist updated stats after each committed decision. */
@@ -86,7 +88,12 @@ interface Props {
   now?: () => number;
 }
 
-export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayKey, now = Date.now }: Props) {
+export function GameScreen({ variant, hands, initialStats, haptics = true, onDone, onStats, dayKey, now = Date.now }: Props) {
+  // Haptic helpers honoring the Settings toggle.
+  const buzzOk = () => haptics && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  const buzzBad = () => haptics && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+  const buzzWarn = () => haptics && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+  const buzzWin = () => haptics && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
   const [game, setGame] = useState<GameState>(() => newGame(variant, hands, { now: now(), stats: initialStats }));
   const [tokens, setTokens] = useState<CheckerToken[]>([]);
   const [feedback, setFeedback] = useState<CalcPadFeedback | null>(null);
@@ -167,13 +174,13 @@ export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayK
         // Fast, near-perfect solve: extra haptic punch + the celebration overlay.
         flourishNonce.current += 1;
         setCelebrate(true);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+        buzzWin();
       } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        buzzOk();
       }
       settle(out.state, "ok");
     } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      buzzWarn();
       pulse("bad");
       setFeedback({ kind: "bad", text: wrongFeedbackText(out.error, expr, hand.target) });
     }
@@ -183,12 +190,12 @@ export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayK
     if (pending || !hand) return;
     const out = claimNoSolution(game, now(), dayKey());
     if (out.correct) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      buzzOk();
       pulse("ok");
       setFeedback({ kind: "ok", text: "correct — no solution exists" });
       settle(out.state, "ok");
     } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      buzzBad();
       pulse("bad");
       setFeedback({ kind: "bad", text: out.reveal?.solution ? `it was solvable: ${out.reveal.solution}` : "it was solvable" });
       settle(out.state, "bad");
@@ -198,7 +205,7 @@ export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayK
   const pass = () => {
     if (pending || !hand) return;
     const out = giveUp(game, now(), dayKey());
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    buzzBad();
     pulse("bad");
     setFeedback({
       kind: "bad",
@@ -279,6 +286,7 @@ export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayK
             onNoSolution={noSolution}
             onPass={pass}
             feedback={feedback}
+            haptics={haptics}
           />
         )}
 

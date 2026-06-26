@@ -50,6 +50,8 @@ interface Props {
   onPass: () => void;
   /** Optional inline detail line under the pad. */
   feedback?: CalcPadFeedback | null;
+  /** When false, suppress key-press selection haptics (Settings toggle). */
+  haptics?: boolean;
 }
 
 /** Top-to-bottom operator column, iOS-calculator order. */
@@ -92,9 +94,10 @@ export function CalcPad({
   onNoSolution,
   onPass,
   feedback,
+  haptics = true,
 }: Props) {
   const tap = (fn: () => void) => () => {
-    Haptics.selectionAsync();
+    if (haptics) Haptics.selectionAsync();
     fn();
   };
 
@@ -136,7 +139,7 @@ export function CalcPad({
                   index={i}
                   dealNonce={dealNonce}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    if (haptics) Haptics.selectionAsync();
                     onCardPress(i);
                   }}
                 />

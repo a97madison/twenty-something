@@ -11,19 +11,23 @@ interface Props {
   onChallenge: () => void;
   onStats: () => void;
   onInstructions: () => void;
+  onSettings: () => void;
   /** True once today's daily has been played — locks the Daily button. */
   dailyDone?: boolean;
   /** Live daily-streak status for the streak banner. */
   streak?: DailyStreakStatus;
 }
 
-/** Landing screen: brand, the entry points, and the "i" → Instructions. */
-export function HomeScreen({ onPlay, onDaily, onChallenge, onStats, onInstructions, dailyDone, streak }: Props) {
+/** Landing screen: brand, the entry points, the "i" → Instructions, and ⚙ → Settings. */
+export function HomeScreen({ onPlay, onDaily, onChallenge, onStats, onInstructions, onSettings, dailyDone, streak }: Props) {
   const showStreak = streak && streak.alive && streak.current >= 1;
   return (
     <SafeAreaView style={styles.safe}>
       <Tappable style={styles.info} onPress={onInstructions} hitSlop={12} accessibilityLabel="How to play">
         <Text style={styles.infoText}>i</Text>
+      </Tappable>
+      <Tappable style={styles.gear} onPress={onSettings} hitSlop={12} accessibilityLabel="Settings">
+        <Text style={styles.gearText}>⚙</Text>
       </Tappable>
 
       <View style={styles.hero}>
@@ -79,6 +83,20 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   infoText: { fontFamily: fonts.serifBold, fontSize: 18, color: colors.inkDim },
+  gear: {
+    position: "absolute",
+    top: 56,
+    left: 24,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: colors.line2,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  gearText: { fontSize: 17, color: colors.inkDim },
   hero: { flex: 1, justifyContent: "center", alignItems: "center" },
   wordmark: { fontFamily: fonts.serifBold, fontSize: 40, color: colors.ink },
   dot: { color: colors.accent },

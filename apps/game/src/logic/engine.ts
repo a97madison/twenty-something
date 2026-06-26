@@ -837,3 +837,52 @@ function sanitizeStats(x: unknown): AllStats {
   const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
   return { "24": sanitizeVariant(o["24"]), "20_something": sanitizeVariant(o["20_something"]) };
 }
+
+// --- App preferences -----------------------------------------------------------
+//
+// User-controlled toggles. `haptics` is consumed live (the game guards its taps
+// on it); `sound` and the notify* flags are stored for the systems that read
+// them once delivered (sound = expo-av, notify* = the planner's category gates).
+
+export interface Prefs {
+  haptics: boolean;
+  sound: boolean;
+  notifyDaily: boolean;
+  notifyStreak: boolean;
+  notifyWeekly: boolean;
+}
+
+export function defaultPrefs(): Prefs {
+  return { haptics: true, sound: true, notifyDaily: true, notifyStreak: true, notifyWeekly: true };
+}
+
+const PREFS_KEY = "twenty-something:prefs";
+
+/** Load saved preferences, defaulting everything ON for missing/corrupt data. */
+export async function loadPrefs(store: KeyValueStore): Promise<Prefs> {
+  const raw = await store.getItem(PREFS_KEY);
+  if (raw === null) return defaultPrefs();
+  try {
+    return sanitizePrefs(JSON.parse(raw));
+  } catch {
+    return defaultPrefs();
+  }
+}
+
+/** Persist preferences as JSON. */
+export async function savePrefs(store: KeyValueStore, prefs: Prefs): Promise<void> {
+  await store.setItem(PREFS_KEY, JSON.stringify(prefs));
+}
+
+function sanitizePrefs(x: unknown): Prefs {
+  const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
+  const d = defaultPrefs();
+  const bool = (v: unknown, dflt: boolean) => (typeof v === "boolean" ? v : dflt);
+  return {
+    haptics: bool(o.haptics, d.haptics),
+    sound: bool(o.sound, d.sound),
+    notifyDaily: bool(o.notifyDaily, d.notifyDaily),
+    notifyStreak: bool(o.notifyStreak, d.notifyStreak),
+    notifyWeekly: bool(o.notifyWeekly, d.notifyWeekly),
+  };
+}

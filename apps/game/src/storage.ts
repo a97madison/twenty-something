@@ -6,7 +6,9 @@ import type { KeyValueStore } from "./logic";
  * AsyncStorage adapter for the engine's KeyValueStore interface. Kept out of
  * the pure logic so the engine stays node-testable with an in-memory fake.
  */
-export const storage: KeyValueStore = {
+export const storage: KeyValueStore & { clear(): Promise<void> } = {
   getItem: (key) => AsyncStorage.getItem(key),
   setItem: (key, value) => AsyncStorage.setItem(key, value),
+  // Wipe everything — backs the Settings "delete all my data" control.
+  clear: () => AsyncStorage.clear(),
 };
