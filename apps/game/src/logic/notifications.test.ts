@@ -11,6 +11,7 @@ const base: NotifyInputs = {
   nextNudgeMs: 33 * HOUR, // tomorrow morning
   nextWeeklyResetMs: 3 * 24 * HOUR,
   streak: 5,
+  freezes: 0,
   playedToday: false,
 };
 
@@ -31,6 +32,19 @@ test("streak-at-risk fires when a live streak is unprotected, lead-time before m
 test("no streak-risk note when already played today or no streak", () => {
   assert.equal(planNotifications({ ...base, playedToday: true }).some((n) => n.id === "streak-risk"), false);
   assert.equal(planNotifications({ ...base, streak: 0 }).some((n) => n.id === "streak-risk"), false);
+});
+
+test("streak-risk softens when a freeze is banked", () => {
+  const risk = planNotifications({ ...base, freezes: 1 }).find((n) => n.id === "streak-risk");
+  assert.match(risk!.body, /freeze can save it/);
+  assert.match(risk!.body, /5-day streak/); // still personalized
+});
+
+test("streak-risk becomes a perfect-week carrot the day before a 7-multiple", () => {
+  const risk = planNotifications({ ...base, streak: 6 }).find((n) => n.id === "streak-risk");
+  assert.equal(risk!.title, "Perfect week within reach");
+  assert.match(risk!.body, /perfect week/);
+  assert.match(risk!.body, /free freeze/);
 });
 
 test("no streak-risk note when its fire time is already in the past", () => {

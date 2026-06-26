@@ -34,12 +34,17 @@ export interface NotifyInputs {
   nextWeeklyResetMs: number;
   /** Current daily streak (consecutive days completed). */
   streak: number;
+  /** Banked streak freezes — softens the at-risk warning when you're covered. */
+  freezes: number;
   /** Whether today's daily has already been played. */
   playedToday: boolean;
 }
 
 /** How long before local midnight to warn that a live streak is about to lapse. */
 export const STREAK_RISK_LEAD_HOURS = 3;
+
+/** Streak length that completes a perfect week (mirrors engine PERFECT_WEEK). */
+const PERFECT_WEEK = 7;
 
 /**
  * Build the list of notifications to (re)schedule for this device right now.
@@ -54,11 +59,19 @@ export function planNotifications(i: NotifyInputs): NotePlan[] {
   if (i.streak > 0 && !i.playedToday) {
     const fireAtMs = i.nextMidnightMs - STREAK_RISK_LEAD_HOURS * HOUR_MS;
     if (fireAtMs > i.nowMs) {
+      // One more day completes a perfect week → lead with that carrot; otherwise
+      // soften the warning if a freeze has you covered, else the urgent version.
+      const perfectWeekNext = (i.streak + 1) % PERFECT_WEEK === 0;
+      const body = perfectWeekNext
+        ? `🎉 One more day for a perfect week! Finish your ${i.streak}-day streak and bank a free freeze.`
+        : i.freezes > 0
+          ? `🔥 Your ${i.streak}-day streak is at risk — a freeze can save it, but keep the run alive.`
+          : `🔥 Your ${i.streak}-day streak ends in ${STREAK_RISK_LEAD_HOURS} hours — play today's challenge.`;
       plan.push({
         id: "streak-risk",
         fireAtMs,
-        title: "Don't break the chain",
-        body: `🔥 Your ${i.streak}-day streak ends in ${STREAK_RISK_LEAD_HOURS} hours — play today's challenge.`,
+        title: perfectWeekNext ? "Perfect week within reach" : "Don't break the chain",
+        body,
       });
     }
   }
