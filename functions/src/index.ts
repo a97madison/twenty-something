@@ -23,6 +23,7 @@ import {
   computePercentile,
 } from "./percentile.ts";
 import type { DailyPuzzleDoc, UserDoc, RoomDoc, RoomRoundDoc } from "./model.ts";
+import { dealSolvableRound, makeRoomCode, sanitizeWinningScore, sanitizeDuration } from "./rooms.ts";
 
 initializeApp();
 const db = getFirestore();
@@ -251,4 +252,104 @@ export const submitRoomSolution = onCall<SubmitInput>(async (request) => {
   });
 
   return result;
+});
+
+// --------------------------------------------------------------------------
+// Live rooms — lobby / join / deal a round. submitRoomSolution (above) scores
+// each round: first valid solve wins. These three set the table for it.
+// --------------------------------------------------------------------------
+
+interface CreateRoomInput {
+  variant?: unknown;
+  winningScore?: unknown;
+}
+
+export const createRoom = onCall<CreateRoomInput>(async (request) => {
+  const uid = requireUid(request.auth);
+  const variant = request.data.variant;
+  if (!VARIANTS.has(variant as Variant)) {
+    throw new HttpsError("invalid-argument", "Unknown variant.");
+  }
+  const winningScore = sanitizeWinningScore(request.data.winningScore);
+
+  // Allocate a short code that isn't already live (collisions are rare).
+  let roomId = "";
+  for (let i = 0; i < 6; i++) {
+    const candidate = makeRoomCode(Math.random);
+    if (!(await db.doc(`rooms/${candidate}`).get()).exists) {
+      roomId = candidate;
+      break;
+    }
+  }
+  if (!roomId) throw new HttpsError("resource-exhausted", "Couldn't allocate a room code.");
+
+  await db.doc(`rooms/${roomId}`).set({
+    status: "lobby",
+    hostId: uid,
+    variant,
+    config: { winningScore },
+    createdAt: Timestamp.now(),
+  });
+  await db.doc(`rooms/${roomId}/players/${uid}`).set({ score: 0, joinedAt: Timestamp.now() });
+  return { roomId, variant, winningScore };
+});
+
+interface JoinRoomInput {
+  roomId?: unknown;
+}
+
+export const joinRoom = onCall<JoinRoomInput>(async (request) => {
+  const uid = requireUid(request.auth);
+  const roomId = typeof request.data.roomId === "string" ? request.data.roomId.toUpperCase() : "";
+  const snap = await db.doc(`rooms/${roomId}`).get();
+  if (!snap.exists) throw new HttpsError("not-found", "Room not found.");
+  const room = snap.data() as RoomDoc;
+  if (room.status === "finished") throw new HttpsError("failed-precondition", "That match is over.");
+
+  await db.doc(`rooms/${roomId}/players/${uid}`).set({ score: 0, joinedAt: Timestamp.now() }, { merge: true });
+  return { roomId, variant: room.variant, winningScore: room.config.winningScore, status: room.status };
+});
+
+interface DealRoundInput {
+  roomId?: unknown;
+  roundNumber?: unknown;
+  durationSec?: unknown;
+}
+
+export const dealRoomRound = onCall<DealRoundInput>(async (request) => {
+  const uid = requireUid(request.auth);
+  const roomId = typeof request.data.roomId === "string" ? request.data.roomId.toUpperCase() : "";
+  const roundNumber = request.data.roundNumber;
+  if (typeof roundNumber !== "number" || !Number.isInteger(roundNumber) || roundNumber < 1) {
+    throw new HttpsError("invalid-argument", "Bad round number.");
+  }
+  const roomRef = db.doc(`rooms/${roomId}`);
+  const snap = await roomRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Room not found.");
+  const room = snap.data() as RoomDoc;
+  // Only the host deals — keeps two clients from racing to create the round.
+  if (room.hostId !== uid) throw new HttpsError("permission-denied", "Only the host can deal.");
+
+  const round = dealSolvableRound(room.variant, Math.random);
+  const durationSec = sanitizeDuration(request.data.durationSec);
+  const endsAt = durationSec ? Timestamp.fromMillis(Date.now() + durationSec * 1000) : null;
+
+  await db.doc(`rooms/${roomId}/rounds/${roundNumber}`).set({
+    roundNumber,
+    cards: round.cards,
+    target: round.target,
+    operations: round.operations,
+    status: "racing",
+    startedAt: Timestamp.now(),
+    endsAt,
+    winnerId: null,
+  });
+  await roomRef.update({ status: "in_progress" });
+  return {
+    roundNumber,
+    cards: round.cards,
+    target: round.target,
+    operations: round.operations,
+    endsAt: endsAt ? endsAt.toMillis() : null,
+  };
 });

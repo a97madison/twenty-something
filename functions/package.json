@@ -10,7 +10,7 @@
   },
   "scripts": {
     "pretest": "npm run build -w @twenty-something/core",
-    "test": "node --test --experimental-strip-types src/logic.test.ts src/daily.test.ts",
+    "test": "node --test --experimental-strip-types src/logic.test.ts src/daily.test.ts src/rooms.test.ts",
     "typecheck": "tsc --noEmit",
     "build:deploy": "npm run build -w @twenty-something/core && esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --external:firebase-admin --external:firebase-admin/* --external:firebase-functions --external:firebase-functions/* --outfile=lib/index.js"
   },
