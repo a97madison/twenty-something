@@ -164,5 +164,21 @@ The "well-rounded app" layer around the game, all pure-client / no new deps:
   still ⛔ on the dev build; **social notifications (challenge accepted / rival
   passed you) remain unbuilt — they need server-side push, not local scheduling.**
 
-Still open in stage 4 (not yet built): **analytics + crash reporting** (JS-capable
-pre-dev-build), store legal/assets, and the social-push architecture.
+- **Deep-link challenge URLs** — friend challenges are now a tappable link
+  (`…/?c=<code>`), not a pasted code: App routes an incoming link (web location +
+  native `Linking`, cold-start + while-open) straight into the accept flow and
+  cleans the web address bar; "Enter a code" also accepts a pasted link; the
+  create-summary shares the link. Web-verified end-to-end. This is the web-first
+  viral multiplier (ROADMAP §5) — works in-browser today; native universal-link
+  config comes with the dev build + a real domain.
+- **Analytics — instrumented, sink pending.** Dependency-free `track()` layer
+  (`apps/game/src/analytics.ts`) with a pluggable sink (no-op in prod, console in
+  dev) + a canonical `Events` taxonomy; the whole funnel is instrumented
+  (app_open → game_complete, challenge create/accept/result, deep_link_open,
+  shares, settings, delete). The real SDK plugs into `setAnalyticsSink` at the
+  dev-build step — no graph change needed now.
+
+Still open in stage 4 (not yet built): **crash reporting**, the analytics **sink**
+(pick PostHog/Firebase/REST at the dev build), store legal/assets, and the
+**social-push architecture** (challenge-accepted / rival-passed-you notifications
+need server push, not local scheduling).
