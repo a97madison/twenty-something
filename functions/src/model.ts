@@ -33,7 +33,7 @@ export interface DailyResultDoc {
 }
 
 export interface RoomDoc {
-  status: "lobby" | "in_progress" | "finished";
+  status: "lobby" | "ready_up" | "in_progress" | "finished";
   hostId: string;
   /** Which game the room plays — drives server-side round dealing. */
   variant: Variant;

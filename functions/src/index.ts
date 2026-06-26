@@ -317,6 +317,39 @@ export const joinRoom = onCall<JoinRoomInput>(PUBLIC, async (request) => {
   return { roomId, variant: room.variant, winningScore: room.config.winningScore, status: room.status };
 });
 
+interface RoomActionInput {
+  roomId?: unknown;
+}
+
+// Host kicks off the ready-up phase: clears everyone's ready flag and moves the
+// room to `ready_up`. The round only deals once all players have readied (see
+// dealRoomRound's gate), so nobody starts racing before they're set.
+export const startMatch = onCall<RoomActionInput>(PUBLIC, async (request) => {
+  const uid = requireUid(request.auth);
+  const roomId = typeof request.data.roomId === "string" ? request.data.roomId.toUpperCase() : "";
+  const roomRef = db.doc(`rooms/${roomId}`);
+  const snap = await roomRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Room not found.");
+  if ((snap.data() as RoomDoc).hostId !== uid) throw new HttpsError("permission-denied", "Only the host can start.");
+
+  const players = await roomRef.collection("players").get();
+  const batch = db.batch();
+  players.docs.forEach((d) => batch.set(d.ref, { ready: false }, { merge: true }));
+  batch.update(roomRef, { status: "ready_up" });
+  await batch.commit();
+  return { ok: true };
+});
+
+// A player marks themselves ready during the ready-up phase.
+export const readyUp = onCall<RoomActionInput>(PUBLIC, async (request) => {
+  const uid = requireUid(request.auth);
+  const roomId = typeof request.data.roomId === "string" ? request.data.roomId.toUpperCase() : "";
+  const roomRef = db.doc(`rooms/${roomId}`);
+  if (!(await roomRef.get()).exists) throw new HttpsError("not-found", "Room not found.");
+  await roomRef.collection("players").doc(uid).set({ ready: true }, { merge: true });
+  return { ok: true };
+});
+
 interface DealRoundInput {
   roomId?: unknown;
   roundNumber?: unknown;
@@ -336,6 +369,13 @@ export const dealRoomRound = onCall<DealRoundInput>(PUBLIC, async (request) => {
   const room = snap.data() as RoomDoc;
   // Only the host deals — keeps two clients from racing to create the round.
   if (room.hostId !== uid) throw new HttpsError("permission-denied", "Only the host can deal.");
+
+  // Starting the match (leaving ready_up) requires everyone to have readied up.
+  if (room.status === "ready_up") {
+    const players = await roomRef.collection("players").get();
+    const allReady = players.size > 0 && players.docs.every((d) => d.data().ready === true);
+    if (!allReady) throw new HttpsError("failed-precondition", "Waiting for all players to ready up.");
+  }
 
   const round = dealSolvableRound(room.variant, Math.random);
   const durationSec = sanitizeDuration(request.data.durationSec);
@@ -377,7 +417,7 @@ export const getRoomState = onCall<RoomStateInput>(PUBLIC, async (request) => {
   const room = roomSnap.data() as RoomDoc;
 
   const playersSnap = await roomRef.collection("players").get();
-  const players = playersSnap.docs.map((d) => ({ uid: d.id, score: (d.data().score as number) ?? 0 }));
+  const players = playersSnap.docs.map((d) => ({ uid: d.id, score: (d.data().score as number) ?? 0, ready: d.data().ready === true }));
 
   const roundsSnap = await roomRef.collection("rounds").orderBy("roundNumber", "desc").limit(1).get();
   const round = roundsSnap.empty
