@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { Share, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Share, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import { buildDailyShareText, type Variant } from "@twenty-something/core";
 import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
@@ -53,6 +54,20 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
   const sessionRating = s.total === 0 ? null : s.starSum / s.total;
   const sessionAccuracy = s.total === 0 ? null : s.correct / s.total;
   const sessionAvg = s.correct === 0 ? null : s.timeSumCorrect / s.correct;
+
+  // Headline rating counts up on mount — stars and number in sync — then lands
+  // with a success haptic. The little dopamine beat the quiet summary was missing.
+  const countUp = useRef(new Animated.Value(0)).current;
+  const [shownRating, setShownRating] = useState(0);
+  useEffect(() => {
+    if (sessionRating === null) return;
+    const id = countUp.addListener(({ value }) => setShownRating(value));
+    Animated.timing(countUp, { toValue: sessionRating, duration: 750, useNativeDriver: false }).start(() => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    });
+    return () => countUp.removeListener(id);
+  }, []); // once, when the summary mounts
+  const headlineRating = sessionRating === null ? null : shownRating;
 
   const prevRollup = allTimeRollup(previousStats[variant]);
   const newRollup = allTimeRollup(finalState.stats[variant]);
@@ -130,8 +145,8 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
 
         {/* Headline: this game's rating. */}
         <View style={styles.headline}>
-          <RatingStars value={sessionRating} size={30} />
-          <Text style={styles.headlineNum}>{formatRating(sessionRating)}</Text>
+          <RatingStars value={headlineRating} size={30} />
+          <Text style={styles.headlineNum}>{formatRating(headlineRating)}</Text>
           <Text style={styles.headlineLabel}>this game</Text>
         </View>
 
