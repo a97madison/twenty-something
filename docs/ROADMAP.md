@@ -115,7 +115,7 @@ Highest-ROI next additions, in order:
 1. ~~**Share button** on the daily~~ — ✅ shipped (outcome-only, core `buildDailyShareText`).
 2. **Daily percentile** (§3) — turns a solo result into a competitive one; backend code + deploy bundling done, needs the Firebase login/billing.
 3. **Streak freeze / "perfect week"** badges — loss-aversion keeps the streak alive.
-4. **Win flourish** on a fast 5-star solve (confetti/sound) — the dopamine spike the quiet loop is missing.
+4. ~~**Win flourish** on a fast 5-star solve~~ ✅ shipped — a solve worth ≥4.5★ (≈ ≤16s) bursts a ring of felt-green stars over the cards + a heavy haptic. On-brand (no plastic confetti), built-in Animated, no new deps. Web-verified via a real solve.
 5. ~~**First-solve haptic + count-up** on the rating delta in Summary.~~ ✅ shipped — the Summary headline rating counts up from 0 (stars + number in sync off one Animated.Value) and lands with a success haptic. Web-verified (0.26 mid-flight → 2.00 settled). Built-in Animated + expo-haptics, no new deps.
 
 ## Status at a glance
