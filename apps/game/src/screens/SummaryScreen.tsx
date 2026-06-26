@@ -32,7 +32,8 @@ interface ChallengeContext {
   seed: string;
   hands: number;
   myName?: string;
-  challenger?: { name: string; rating: number };
+  myPlayerId?: string;
+  challenger?: { name: string; rating: number; playerId?: string };
 }
 
 interface Props {
@@ -47,12 +48,16 @@ interface Props {
   challenge?: ChallengeContext;
   /** Daily only: the streak after this play + what happened. */
   dailyStreak?: { current: number; freezes: number; event: DailyStreakEvent };
+  /** Challenge-accept only: your head-to-head record vs this friend, after this game. */
+  rival?: { name: string; wins: number; losses: number; ties: number };
   onPlayAgain: () => void;
   onHome: () => void;
+  /** Challenge-accept only: start a fresh challenge to send back. */
+  onRematch?: () => void;
 }
 
 /** End-of-game summary: this session's results plus the all-time / weekly rating block. */
-export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey, challenge, dailyStreak, onPlayAgain, onHome }: Props) {
+export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey, challenge, dailyStreak, rival, onPlayAgain, onHome, onRematch }: Props) {
   const s = finalState.session;
   const sessionRating = s.total === 0 ? null : s.starSum / s.total;
   const sessionAccuracy = s.total === 0 ? null : s.correct / s.total;
@@ -125,6 +130,17 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
   const versus = isAccept && sessionRating !== null ? challengeOutcome(sessionRating, challenger!.rating) : null;
   const rivalName = (challenger?.name || "").trim() || "your friend";
 
+  // The running series vs this friend (rival counts already include this game).
+  const recordLine = (() => {
+    if (!rival) return null;
+    const { wins, losses, ties } = rival;
+    if (wins + losses + ties <= 1) return `First game vs ${rivalName}`;
+    const t = ties ? `–${ties}` : "";
+    if (wins > losses) return `You lead ${rivalName} ${wins}–${losses}${t}`;
+    if (losses > wins) return `${rivalName} leads ${losses}–${wins}${t}`;
+    return `All square with ${rivalName} ${wins}–${losses}${t}`;
+  })();
+
   // Create: the shareable code carrying this game's seed + rating, plus a friendly invite.
   const onShareChallenge = () => {
     if (!isCreate || sessionRating === null) return;
@@ -134,6 +150,7 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
       hands: challenge!.hands,
       rating: sessionRating,
       name: challenge!.myName ?? "",
+      playerId: challenge!.myPlayerId,
     });
     const message = [
       `I scored ${sessionRating.toFixed(1)}★ on a ${variantLabel(variant)} challenge — same ${challenge!.hands} hands. Can you beat me?`,
@@ -182,6 +199,7 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
               You {sessionRating!.toFixed(1)}★ · {rivalName} {challenger!.rating.toFixed(1)}★
               {versus.result !== "tie" ? `  (by ${versus.diff.toFixed(1)})` : ""}
             </Text>
+            {recordLine && <Text style={styles.versusRecord}>{recordLine}</Text>}
           </View>
         )}
 
@@ -261,13 +279,17 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
             <Tappable style={[styles.btn, styles.primary]} onPress={onShareChallenge}>
               <Text style={styles.primaryText}>Share challenge code</Text>
             </Tappable>
+          ) : isAccept && onRematch ? (
+            <Tappable style={[styles.btn, styles.primary]} onPress={onRematch}>
+              <Text style={styles.primaryText}>Challenge them back</Text>
+            </Tappable>
           ) : mode === "challenge" ? null : (
             <Tappable style={[styles.btn, styles.primary]} onPress={onPlayAgain}>
               <Text style={styles.primaryText}>Play again</Text>
             </Tappable>
           )}
-          <Tappable style={[styles.btn, mode === "challenge" && !isCreate ? styles.primary : styles.secondary]} onPress={onHome}>
-            <Text style={mode === "challenge" && !isCreate ? styles.primaryText : styles.secondaryText}>Back to home</Text>
+          <Tappable style={[styles.btn, styles.secondary]} onPress={onHome}>
+            <Text style={styles.secondaryText}>Back to home</Text>
           </Tappable>
           {mode === "daily" && <Text style={styles.tomorrow}>Try again tomorrow</Text>}
         </View>
@@ -303,6 +325,7 @@ const styles = StyleSheet.create({
   versusTie: { borderColor: colors.line2 },
   versusVerdict: { fontFamily: fonts.serifBold, fontSize: 17, color: colors.ink, textAlign: "center" },
   versusLine: { fontFamily: fonts.sans, fontSize: 13, color: colors.inkDim, textAlign: "center" },
+  versusRecord: { fontFamily: fonts.serifSemibold, fontSize: 13, color: colors.accent, textAlign: "center", marginTop: 2 },
   streakCard: { marginTop: 12, padding: 12, borderRadius: radius.md, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2, alignItems: "center", gap: 3, ...shadows.soft },
   streakCardWin: { borderColor: colors.accent },
   streakMsg: { fontFamily: fonts.serifSemibold, fontSize: 15, color: colors.ink, textAlign: "center" },

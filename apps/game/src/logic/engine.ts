@@ -722,6 +722,91 @@ function sanitizeDailyStreak(x: unknown): DailyStreak {
   };
 }
 
+// --- Friend head-to-head record (rivals) --------------------------------------
+//
+// A persistent win/loss/tie record per friend, so a challenge isn't a one-off —
+// you build a series against a "specific friend". Identity is the challenger's
+// stable playerId (from a TS2 code), falling back to their name when there isn't
+// one, so renames don't fork the record and two same-named friends don't merge.
+// The ACCEPTER records each finished challenge (they see both ratings); over a
+// rematch exchange both sides accrue their own record.
+
+export interface Rival {
+  /** Latest display name seen for this friend. */
+  name: string;
+  /** Games you scored higher / lower / equal on. */
+  wins: number;
+  losses: number;
+  ties: number;
+  /** Last dayKey you played them, or null. */
+  lastPlayed: string | null;
+}
+
+export type Rivals = Record<string, Rival>;
+
+export function emptyRivals(): Rivals {
+  return {};
+}
+
+/** Stable record key for a friend: their playerId if known, else their name. */
+export function friendKey(playerId: string | undefined, name: string): string {
+  const id = (playerId ?? "").trim();
+  return id ? `id:${id}` : `name:${name.trim().toLowerCase()}`;
+}
+
+/** Fold one finished head-to-head game into the record (from YOUR point of view). */
+export function recordRivalGame(
+  rivals: Rivals,
+  key: string,
+  name: string,
+  result: "win" | "loss" | "tie",
+  dayKey: string,
+): Rivals {
+  const prev = rivals[key] ?? { name, wins: 0, losses: 0, ties: 0, lastPlayed: null };
+  const next: Rival = {
+    name: name.trim() || prev.name, // keep the latest non-empty name
+    wins: prev.wins + (result === "win" ? 1 : 0),
+    losses: prev.losses + (result === "loss" ? 1 : 0),
+    ties: prev.ties + (result === "tie" ? 1 : 0),
+    lastPlayed: dayKey,
+  };
+  return { ...rivals, [key]: next };
+}
+
+const RIVALS_KEY = "twenty-something:rivals";
+
+/** Load the saved rivals record, fresh on missing/corrupt data. */
+export async function loadRivals(store: KeyValueStore): Promise<Rivals> {
+  const raw = await store.getItem(RIVALS_KEY);
+  if (raw === null) return emptyRivals();
+  try {
+    return sanitizeRivals(JSON.parse(raw));
+  } catch {
+    return emptyRivals();
+  }
+}
+
+/** Persist the rivals record as JSON. */
+export async function saveRivals(store: KeyValueStore, rivals: Rivals): Promise<void> {
+  await store.setItem(RIVALS_KEY, JSON.stringify(rivals));
+}
+
+function sanitizeRivals(x: unknown): Rivals {
+  const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
+  const out: Rivals = {};
+  for (const [k, v] of Object.entries(o)) {
+    const r = (typeof v === "object" && v !== null ? v : {}) as Record<string, unknown>;
+    out[k] = {
+      name: typeof r.name === "string" ? r.name : "",
+      wins: Math.floor(num(r.wins)),
+      losses: Math.floor(num(r.losses)),
+      ties: Math.floor(num(r.ties)),
+      lastPlayed: typeof r.lastPlayed === "string" ? r.lastPlayed : null,
+    };
+  }
+  return out;
+}
+
 function num(x: unknown, floor = 0): number {
   return typeof x === "number" && Number.isFinite(x) && x >= floor ? x : floor;
 }

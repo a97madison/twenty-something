@@ -16,6 +16,28 @@ test("the 24 variant survives the round-trip", () => {
   assert.equal(decodeChallenge(encodeChallenge(c))?.variant, "24");
 });
 
+test("a playerId round-trips (TS2)", () => {
+  const c: Challenge = { ...sample, playerId: "ab12cd34" };
+  const round = decodeChallenge(encodeChallenge(c));
+  assert.equal(round?.playerId, "ab12cd34");
+  assert.deepEqual(round, c);
+});
+
+test("legacy TS1 codes still decode (no playerId)", () => {
+  const c = decodeChallenge("TS1.24.abc123.5.40.Riley");
+  assert.ok(c);
+  assert.equal(c!.seed, "abc123");
+  assert.equal(c!.rating, 4);
+  assert.equal(c!.name, "Riley");
+  assert.equal(c!.playerId, undefined);
+});
+
+test("a TS2 code with an empty playerId omits it", () => {
+  const round = decodeChallenge(encodeChallenge({ ...sample, playerId: "" }));
+  assert.equal(round?.playerId, undefined);
+  assert.equal(round?.name, sample.name);
+});
+
 test("the code carries the seed that re-deals identical hands", () => {
   const code = encodeChallenge(sample);
   const c = decodeChallenge(code)!;

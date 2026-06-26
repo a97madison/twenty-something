@@ -3,7 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Variant } from "@twenty-something/core";
 import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
-import { VARIANTS, allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type Rollup } from "../logic";
+import { VARIANTS, allTimeRollup, weeklyRollup, msUntilWeeklyReset, type AllStats, type Rollup, type Rivals } from "../logic";
 import { RatingStars } from "./RatingStars";
 import { formatAccuracy, formatCloses, formatRating, formatSolve, variantLabel } from "./format";
 
@@ -14,12 +14,13 @@ const WEEKLY_GATE = 5;
 
 interface Props {
   stats: AllStats;
+  rivals: Rivals;
   dayKey: string;
   onBack: () => void;
 }
 
-/** Per-variant stats: accuracy, avg time, and rating (★), all-time + weekly, gated. */
-export function StatsScreen({ stats, dayKey, onBack }: Props) {
+/** Per-variant stats + the head-to-head record vs each friend. */
+export function StatsScreen({ stats, rivals, dayKey, onBack }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <Tappable style={styles.back} onPress={onBack} hitSlop={12} accessibilityLabel="Back">
@@ -30,8 +31,34 @@ export function StatsScreen({ stats, dayKey, onBack }: Props) {
         {VARIANTS.map((v) => (
           <VariantCard key={v} variant={v} stats={stats} dayKey={dayKey} weekCloses={formatCloses(msUntilWeeklyReset(Date.now()))} />
         ))}
+        <RivalsCard rivals={rivals} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** Head-to-head record vs each friend, most recently played first. */
+function RivalsCard({ rivals }: { rivals: Rivals }) {
+  const rows = Object.values(rivals).sort((a, b) => (b.lastPlayed ?? "").localeCompare(a.lastPlayed ?? ""));
+  if (rows.length === 0) return null;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Rivals</Text>
+      {rows.map((r, i) => {
+        const lead = r.wins > r.losses ? "up" : r.losses > r.wins ? "down" : "even";
+        return (
+          <View key={i} style={styles.rivalRow}>
+            <Text style={styles.rivalName} numberOfLines={1}>
+              {r.name || "Anonymous"}
+            </Text>
+            <Text style={[styles.rivalRecord, lead === "up" && styles.rivalUp, lead === "down" && styles.rivalDown]}>
+              {r.wins}–{r.losses}
+              {r.ties ? `–${r.ties}` : ""}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -120,4 +147,9 @@ const styles = StyleSheet.create({
   metaValue: { fontFamily: fonts.serifBold, fontSize: 18, color: colors.ink },
   metaLabel: { fontFamily: fonts.sans, fontSize: 10, letterSpacing: 0.8, color: colors.inkFaint, marginTop: 2 },
   hr: { height: 1, backgroundColor: colors.line, marginVertical: 16 },
+  rivalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 9, borderTopWidth: 1, borderTopColor: colors.line },
+  rivalName: { fontFamily: fonts.serifSemibold, fontSize: 16, color: colors.ink, flex: 1, marginRight: 12 },
+  rivalRecord: { fontFamily: fonts.serifBold, fontSize: 16, color: colors.inkDim },
+  rivalUp: { color: colors.good },
+  rivalDown: { color: colors.bad },
 });

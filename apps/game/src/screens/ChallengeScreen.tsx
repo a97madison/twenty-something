@@ -13,6 +13,8 @@ const HAND_OPTIONS = [5, 10, 20];
 interface Props {
   /** Remembered display name, so repeat challengers don't retype it. */
   defaultName?: string;
+  /** Which pane to open on — "create" when arriving from a rematch. */
+  initialView?: "hub" | "create";
   /** Create a fresh challenge: play these hands, then share the code from the summary. */
   onCreate: (variant: Variant, hands: number, name: string) => void;
   /** Accept a pasted challenge: re-deal its hands and play head-to-head. */
@@ -27,8 +29,8 @@ type Pane = "hub" | "create" | "enter";
  * the summary) or paste a code to play someone else's hands head-to-head. All
  * offline — the code is the whole transport.
  */
-export function ChallengeScreen({ defaultName = "", onCreate, onAccept, onBack }: Props) {
-  const [view, setView] = useState<Pane>("hub");
+export function ChallengeScreen({ defaultName = "", initialView = "hub", onCreate, onAccept, onBack }: Props) {
+  const [view, setView] = useState<Pane>(initialView);
   const [variant, setVariant] = useState<Variant>("24");
   const [hands, setHands] = useState<number>(5);
   const [name, setName] = useState<string>(defaultName);

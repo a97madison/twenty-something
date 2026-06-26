@@ -20,6 +20,13 @@ import {
   recordDailyPlay,
   dailyStreakStatus,
   emptyDailyStreak,
+  loadRivals,
+  saveRivals,
+  recordRivalGame,
+  friendKey,
+  emptyRivals,
+  randomPlayerId,
+  challengeOutcome,
   emptyStats,
   DAILY_HANDS,
   type AllStats,
@@ -28,6 +35,7 @@ import {
   type DailyStreakEvent,
   type DealtHand,
   type GameState,
+  type Rivals,
 } from "./logic";
 import { storage } from "./storage";
 import { localDayKey } from "./screens/format";
@@ -48,14 +56,16 @@ interface ChallengeContext {
   /** The deal seed — shared in the code so the friend gets identical hands. */
   seed: string;
   hands: number;
-  /** create: the player's name to stamp into the shared code. */
+  /** create: the player's name + stable id to stamp into the shared code. */
   myName?: string;
+  myPlayerId?: string;
   /** accept: who sent the challenge and how they scored, for the head-to-head. */
-  challenger?: { name: string; rating: number };
+  challenger?: { name: string; rating: number; playerId?: string };
 }
 
-/** AsyncStorage key for the remembered challenger name. */
+/** AsyncStorage keys for the remembered name and this device's stable player id. */
 const NAME_KEY = "twenty-something:challenger-name";
+const PLAYER_ID_KEY = "twenty-something:player-id";
 
 /** What it takes to (re)start a game: the variant, the dealt deck, and the mode. */
 interface GameConfig {
@@ -78,6 +88,8 @@ interface SummaryData {
   challenge?: ChallengeContext;
   /** Daily only: the streak after this play + what happened (for messaging). */
   dailyStreak?: { current: number; freezes: number; event: DailyStreakEvent };
+  /** Challenge-accept only: your head-to-head record vs this friend, after this game. */
+  rival?: { name: string; wins: number; losses: number; ties: number };
 }
 
 export default function App() {
@@ -95,6 +107,11 @@ export default function App() {
   const [challengerName, setChallengerName] = useState<string>("");
   // Daily streak (consecutive days) with freeze protection.
   const [dailyStreak, setDailyStreak] = useState<DailyStreak>(() => emptyDailyStreak());
+  // This device's stable player id + the head-to-head record vs each friend.
+  const [playerId, setPlayerId] = useState<string>("");
+  const [rivals, setRivals] = useState<Rivals>(() => emptyRivals());
+  // Which pane the challenge screen opens on ("create" when coming from a rematch).
+  const [challengeInitial, setChallengeInitial] = useState<"hub" | "create">("hub");
 
   // Load saved stats + daily-done marker + remembered name once on mount.
   useEffect(() => {
@@ -110,6 +127,20 @@ export default function App() {
     });
     loadDailyStreak(storage).then((s) => {
       if (alive) setDailyStreak(s);
+    });
+    loadRivals(storage).then((r) => {
+      if (alive) setRivals(r);
+    });
+    // A stable per-device id for friend records — created once, then persisted.
+    storage.getItem(PLAYER_ID_KEY).then((id) => {
+      if (!alive) return;
+      if (id) {
+        setPlayerId(id);
+      } else {
+        const fresh = randomPlayerId();
+        setPlayerId(fresh);
+        storage.setItem(PLAYER_ID_KEY, fresh).catch(() => {});
+      }
     });
     return () => {
       alive = false;
@@ -148,7 +179,7 @@ export default function App() {
       hands: dealSeededHands(seed, variant, hands),
       mode: "challenge",
       count: hands,
-      challenge: { role: "create", seed, hands, myName: name },
+      challenge: { role: "create", seed, hands, myName: name, myPlayerId: playerId },
     });
   };
 
@@ -159,7 +190,12 @@ export default function App() {
       hands: dealSeededHands(c.seed, c.variant, c.hands),
       mode: "challenge",
       count: c.hands,
-      challenge: { role: "accept", seed: c.seed, hands: c.hands, challenger: { name: c.name, rating: c.rating } },
+      challenge: {
+        role: "accept",
+        seed: c.seed,
+        hands: c.hands,
+        challenger: { name: c.name, rating: c.rating, playerId: c.playerId },
+      },
     });
   };
 
@@ -175,6 +211,22 @@ export default function App() {
       saveDailyStreak(storage, nextStreak).catch(() => {});
       streakForSummary = { current: nextStreak.current, freezes: nextStreak.freezes, event };
     }
+
+    // Accepted a friend's challenge → record the head-to-head into the rivalry.
+    let rivalForSummary: SummaryData["rival"];
+    const ch = config.challenge;
+    if (ch?.role === "accept" && ch.challenger) {
+      const s = finalState.session;
+      const myRating = s.total === 0 ? 0 : s.starSum / s.total;
+      const { result } = challengeOutcome(myRating, ch.challenger.rating);
+      const key = friendKey(ch.challenger.playerId, ch.challenger.name);
+      const nextRivals = recordRivalGame(rivals, key, ch.challenger.name, result, today);
+      setRivals(nextRivals);
+      saveRivals(storage, nextRivals).catch(() => {});
+      const r = nextRivals[key]!;
+      rivalForSummary = { name: r.name, wins: r.wins, losses: r.losses, ties: r.ties };
+    }
+
     setSummary({
       variant: config.variant,
       mode: config.mode,
@@ -183,6 +235,7 @@ export default function App() {
       dayKey: today,
       challenge: config.challenge,
       dailyStreak: streakForSummary,
+      rival: rivalForSummary,
     });
     setScreen("summary");
   };
@@ -205,7 +258,10 @@ export default function App() {
           <HomeScreen
             onPlay={() => setScreen("setup")}
             onDaily={startDaily}
-            onChallenge={() => setScreen("challenge")}
+            onChallenge={() => {
+              setChallengeInitial("hub");
+              setScreen("challenge");
+            }}
             onStats={() => setScreen("stats")}
             onInstructions={() => setScreen("instructions")}
             dailyDone={isDailyDone(dailyDoneKey, localDayKey())}
@@ -216,6 +272,7 @@ export default function App() {
         {screen === "challenge" && (
           <ChallengeScreen
             defaultName={challengerName}
+            initialView={challengeInitial}
             onCreate={startChallengeCreate}
             onAccept={startChallengeAccept}
             onBack={() => setScreen("home")}
@@ -242,11 +299,16 @@ export default function App() {
             dayKey={summary.dayKey}
             challenge={summary.challenge}
             dailyStreak={summary.dailyStreak}
+            rival={summary.rival}
             onPlayAgain={playAgain}
             onHome={() => setScreen("home")}
+            onRematch={() => {
+              setChallengeInitial("create");
+              setScreen("challenge");
+            }}
           />
         )}
-        {screen === "stats" && <StatsScreen stats={stats} dayKey={localDayKey()} onBack={() => setScreen("home")} />}
+        {screen === "stats" && <StatsScreen stats={stats} rivals={rivals} dayKey={localDayKey()} onBack={() => setScreen("home")} />}
         {screen === "instructions" && <InstructionsScreen onBack={() => setScreen("home")} />}
       </View>
     </SafeAreaProvider>

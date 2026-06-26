@@ -27,16 +27,21 @@ export interface Challenge {
   rating: number;
   /** The challenger's display name (may be empty). */
   name: string;
+  /** Stable per-device id of the challenger — identifies a "specific friend" for
+   *  the head-to-head record, robust to renames. Absent in legacy (TS1) codes. */
+  playerId?: string;
 }
 
-/** Versioned prefix so a future format change can be detected, not mis-parsed. */
-const PREFIX = "TS1";
+/** Versioned prefixes. TS2 adds the challenger's playerId; TS1 is still decoded. */
+const PREFIX_V2 = "TS2";
+const PREFIX_V1 = "TS1";
 const SEP = ".";
 
 /** Bounds — kept in sync between encode (clamp) and decode (reject/clamp). */
 const MAX_HANDS = 99;
 const MAX_NAME = 16;
 const MAX_RATING = 5;
+const MAX_ID = 12;
 
 const VARIANT_TO_CODE: Record<Variant, string> = { "24": "24", "20_something": "20" };
 const CODE_TO_VARIANT: Record<string, Variant> = { "24": "24", "20": "20_something" };
@@ -49,37 +54,51 @@ function sanitizeName(name: string): string {
     .slice(0, MAX_NAME);
 }
 
+/** Strip a base36 id field to its safe charset, capped. */
+function sanitizeId(id: string): string {
+  return id.replace(/[^0-9a-z]/gi, "").slice(0, MAX_ID);
+}
+
 /** A random base36 deal seed. Impure (Math.random) — call it at the screen boundary. */
 export function randomSeed(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/** A random stable per-device player id. Impure — generate once, then persist. */
+export function randomPlayerId(): string {
+  return (Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6)).slice(0, MAX_ID);
+}
+
 /**
  * Encode a challenge into a compact, paste-safe code, e.g.
- * `TS1.20.k3f9q2z1.5.38.Riley`. Rating is stored as tenths (0–50) so the code
- * stays delimiter-clean. Inputs are clamped to valid ranges.
+ * `TS2.20.k3f9q2z1.5.38.ab12cd.Riley` — version, variant, seed, hands, rating
+ * (tenths), the challenger's playerId, then their name. Inputs are clamped.
  */
 export function encodeChallenge(c: Challenge): string {
   const v = VARIANT_TO_CODE[c.variant];
   const seed = c.seed.replace(/[^0-9a-z]/gi, "");
   const n = Math.max(1, Math.min(MAX_HANDS, Math.round(c.hands)));
   const r10 = Math.max(0, Math.min(MAX_RATING * 10, Math.round(c.rating * 10)));
+  const id = sanitizeId(c.playerId ?? "");
   const name = sanitizeName(c.name);
-  return [PREFIX, v, seed, n, r10, name].join(SEP);
+  return [PREFIX_V2, v, seed, n, r10, id, name].join(SEP);
 }
 
 /**
  * Decode a pasted code back into a Challenge, or null if it isn't a well-formed
- * one. Forgiving of surrounding whitespace; strict about structure so junk text
- * can't masquerade as a challenge. Out-of-range numbers are rejected.
+ * one. Accepts both TS2 (with playerId) and legacy TS1 (no playerId). Forgiving
+ * of surrounding whitespace; strict about structure so junk can't masquerade as
+ * a challenge. Out-of-range numbers are rejected.
  */
 export function decodeChallenge(code: string): Challenge | null {
   if (typeof code !== "string") return null;
   const parts = code.trim().split(SEP);
-  if (parts.length < 6) return null;
-  const [prefix, v, seed, nStr, r10Str, ...nameParts] = parts;
-  if (prefix !== PREFIX) return null;
+  const prefix = parts[0];
+  const v2 = prefix === PREFIX_V2;
+  if (!v2 && prefix !== PREFIX_V1) return null;
+  if (parts.length < (v2 ? 7 : 6)) return null;
 
+  const [, v, seed, nStr, r10Str] = parts;
   const variant = CODE_TO_VARIANT[v!];
   if (!variant) return null;
   if (!seed || !/^[0-9a-z]+$/i.test(seed)) return null;
@@ -90,11 +109,11 @@ export function decodeChallenge(code: string): Challenge | null {
   const r10 = Number(r10Str);
   if (!Number.isInteger(r10) || r10 < 0 || r10 > MAX_RATING * 10) return null;
 
-  // The name is the remainder (rejoined defensively — sanitize stripped its
-  // separators, but a hand-typed code might not have).
-  const name = sanitizeName(nameParts.join(SEP));
+  // TS2: index 5 is the playerId, the name is the remainder. TS1: no id field.
+  const playerId = v2 ? sanitizeId(parts[5] ?? "") : "";
+  const name = sanitizeName(parts.slice(v2 ? 6 : 5).join(SEP));
 
-  return { seed, variant, hands: n, rating: r10 / 10, name };
+  return { seed, variant, hands: n, rating: r10 / 10, name, ...(playerId ? { playerId } : {}) };
 }
 
 /** Head-to-head verdict from the recipient's point of view. */
