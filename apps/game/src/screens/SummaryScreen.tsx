@@ -3,7 +3,7 @@ import { Animated, Share, ScrollView, StyleSheet, Text, View } from "react-nativ
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { buildDailyShareText, type Variant } from "@twenty-something/core";
-import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
+import { colors, fonts, radius, shadows, Tappable, useReducedMotion } from "@twenty-something/ui";
 
 import {
   allTimeRollup,
@@ -68,14 +68,21 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
   // with a success haptic. The little dopamine beat the quiet summary was missing.
   const countUp = useRef(new Animated.Value(0)).current;
   const [shownRating, setShownRating] = useState(0);
+  const reducedMotion = useReducedMotion();
   useEffect(() => {
     if (sessionRating === null) return;
+    if (reducedMotion) {
+      // Reduce motion: jump straight to the final value, no count-up.
+      setShownRating(sessionRating);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      return;
+    }
     const id = countUp.addListener(({ value }) => setShownRating(value));
     Animated.timing(countUp, { toValue: sessionRating, duration: 750, useNativeDriver: false }).start(() => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     });
     return () => countUp.removeListener(id);
-  }, []); // once, when the summary mounts
+  }, [reducedMotion]); // once, when the summary mounts (or if the setting flips)
   const headlineRating = sessionRating === null ? null : shownRating;
 
   const prevRollup = allTimeRollup(previousStats[variant]);

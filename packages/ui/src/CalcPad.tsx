@@ -7,6 +7,7 @@ import { colors, fonts, radius, shadows } from "./theme/tokens";
 import { CARD_BACK } from "./cards";
 import { PlayingCard, CARD_ASPECT } from "./PlayingCard";
 import { Tappable } from "./Tappable";
+import { useReducedMotion } from "./useReducedMotion";
 
 /** Cosmetic suit glyph + ink colour. Index into this with a card's suit index. */
 export interface SuitData {
@@ -186,6 +187,8 @@ export function CalcPad({
 
       {feedback && (
         <Text style={[styles.feedback, feedback.kind === "ok" ? styles.feedbackOk : styles.feedbackBad]}>
+          {/* Lead with a shape glyph so the verdict reads without relying on color. */}
+          {feedback.kind === "ok" ? "✓ " : "✗ "}
           {feedback.text}
         </Text>
       )}
@@ -213,8 +216,13 @@ interface CardCellProps {
  */
 function CardCell({ value, suit, labeled, isTarget, used, index, dealNonce, onPress }: CardCellProps) {
   const anim = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) {
+      anim.setValue(1); // show the face immediately — no flip
+      return;
+    }
     anim.setValue(0);
     Animated.timing(anim, {
       toValue: 1,
@@ -224,7 +232,7 @@ function CardCell({ value, suit, labeled, isTarget, used, index, dealNonce, onPr
       useNativeDriver: true,
     }).start();
     // Re-flip whenever a fresh hand is dealt — all four flip together (no stagger).
-  }, [dealNonce, anim, index]);
+  }, [dealNonce, anim, index, reducedMotion]);
 
   const backRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] });
   const faceRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ["180deg", "360deg"] });

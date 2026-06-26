@@ -12,6 +12,7 @@ export * from "./theme/tokens";
 export * from "./parser";
 export { fontAssets, useAppFonts } from "./fonts";
 export { Tappable } from "./Tappable";
+export { useReducedMotion } from "./useReducedMotion";
 export { CardRow } from "./CardRow";
 export { Keypad } from "./Keypad";
 export { CalcPad } from "./CalcPad";

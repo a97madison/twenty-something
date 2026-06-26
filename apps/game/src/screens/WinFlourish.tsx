@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, View } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
-import { colors, fonts } from "@twenty-something/ui";
+import { colors, fonts, useReducedMotion } from "@twenty-something/ui";
 
 /** Stars in the radial burst. */
 const BURST = 9;
@@ -18,9 +18,14 @@ const DURATION = 750;
  */
 export function WinFlourish() {
   const t = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
   useEffect(() => {
+    if (reducedMotion) return;
     Animated.timing(t, { toValue: 1, duration: DURATION, useNativeDriver: true }).start();
-  }, [t]);
+  }, [t, reducedMotion]);
+
+  // Honor reduce-motion: skip the burst entirely (the haptic + top-bar still fire).
+  if (reducedMotion) return null;
 
   // Center on this overlay's OWN box (it fills its parent), so the burst is
   // correct wherever it's mounted — not tied to the full window.
