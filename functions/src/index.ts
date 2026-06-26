@@ -29,6 +29,12 @@ import { buildExpoPushMessage, challengeResultPush, isExpoPushToken, type Challe
 initializeApp();
 const db = getFirestore();
 
+// Consumer devices have no Google IAM credentials, so the callables must be
+// publicly INVOKABLE at the Cloud Run layer; auth is enforced INSIDE each via
+// requireUid + default-deny Firestore. Setting this in code means `firebase
+// deploy` configures the allUsers run.invoker — no gcloud needed.
+const PUBLIC = { invoker: "public" as const };
+
 /** Shared shape of what the client sends. */
 interface SubmitInput {
   expr: unknown; // untrusted expression tree
@@ -147,7 +153,7 @@ interface DailyGameResultInput {
 
 const VARIANTS = new Set<Variant>(["24", "20_something"]);
 
-export const submitDailyGameResult = onCall<DailyGameResultInput>(async (request) => {
+export const submitDailyGameResult = onCall<DailyGameResultInput>(PUBLIC, async (request) => {
   const uid = requireUid(request.auth);
   const { date, variant, rating } = request.data;
 
@@ -192,7 +198,7 @@ export const submitDailyGameResult = onCall<DailyGameResultInput>(async (request
 // Online room — first valid solve wins
 // --------------------------------------------------------------------------
 
-export const submitRoomSolution = onCall<SubmitInput>(async (request) => {
+export const submitRoomSolution = onCall<SubmitInput>(PUBLIC, async (request) => {
   const uid = requireUid(request.auth);
   const { expr, roomId, roundNumber } = request.data;
 
@@ -265,7 +271,7 @@ interface CreateRoomInput {
   winningScore?: unknown;
 }
 
-export const createRoom = onCall<CreateRoomInput>(async (request) => {
+export const createRoom = onCall<CreateRoomInput>(PUBLIC, async (request) => {
   const uid = requireUid(request.auth);
   const variant = request.data.variant;
   if (!VARIANTS.has(variant as Variant)) {
@@ -299,7 +305,7 @@ interface JoinRoomInput {
   roomId?: unknown;
 }
 
-export const joinRoom = onCall<JoinRoomInput>(async (request) => {
+export const joinRoom = onCall<JoinRoomInput>(PUBLIC, async (request) => {
   const uid = requireUid(request.auth);
   const roomId = typeof request.data.roomId === "string" ? request.data.roomId.toUpperCase() : "";
   const snap = await db.doc(`rooms/${roomId}`).get();
@@ -317,7 +323,7 @@ interface DealRoundInput {
   durationSec?: unknown;
 }
 
-export const dealRoomRound = onCall<DealRoundInput>(async (request) => {
+export const dealRoomRound = onCall<DealRoundInput>(PUBLIC, async (request) => {
   const uid = requireUid(request.auth);
   const roomId = typeof request.data.roomId === "string" ? request.data.roomId.toUpperCase() : "";
   const roundNumber = request.data.roundNumber;
@@ -362,7 +368,7 @@ interface RoomStateInput {
 // The client can't read room docs directly (Firestore is default-deny), so it
 // polls this for live state: status, players + scores, and the current round
 // (cards + target — never a solution; submitRoomSolution stays the authority).
-export const getRoomState = onCall<RoomStateInput>(async (request) => {
+export const getRoomState = onCall<RoomStateInput>(PUBLIC, async (request) => {
   requireUid(request.auth);
   const roomId = typeof request.data.roomId === "string" ? request.data.roomId.toUpperCase() : "";
   const roomRef = db.doc(`rooms/${roomId}`);
@@ -411,7 +417,7 @@ interface RegisterTokenInput {
   token?: unknown;
 }
 
-export const registerPushToken = onCall<RegisterTokenInput>(async (request) => {
+export const registerPushToken = onCall<RegisterTokenInput>(PUBLIC, async (request) => {
   const uid = requireUid(request.auth);
   const { playerId, token } = request.data;
   if (typeof playerId !== "string" || !playerId || !isExpoPushToken(token)) {
@@ -430,7 +436,7 @@ interface ReportResultInput {
 
 const RESULTS = new Set<ChallengeResult>(["win", "loss", "tie"]);
 
-export const reportChallengeResult = onCall<ReportResultInput>(async (request) => {
+export const reportChallengeResult = onCall<ReportResultInput>(PUBLIC, async (request) => {
   requireUid(request.auth);
   const { challengerPlayerId, result, accepterName } = request.data;
   if (typeof challengerPlayerId !== "string" || !RESULTS.has(result as ChallengeResult)) {
