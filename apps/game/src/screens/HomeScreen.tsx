@@ -9,6 +9,7 @@ interface Props {
   onPlay: () => void;
   onDaily: () => void;
   onChallenge: () => void;
+  onRooms: () => void;
   onStats: () => void;
   onInstructions: () => void;
   onSettings: () => void;
@@ -19,7 +20,7 @@ interface Props {
 }
 
 /** Landing screen: brand, the entry points, the "i" → Instructions, and ⚙ → Settings. */
-export function HomeScreen({ onPlay, onDaily, onChallenge, onStats, onInstructions, onSettings, dailyDone, streak }: Props) {
+export function HomeScreen({ onPlay, onDaily, onChallenge, onRooms, onStats, onInstructions, onSettings, dailyDone, streak }: Props) {
   const showStreak = streak && streak.alive && streak.current >= 1;
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,6 +59,9 @@ export function HomeScreen({ onPlay, onDaily, onChallenge, onStats, onInstructio
         </Tappable>
         <Tappable style={[styles.btn, styles.secondary]} onPress={onChallenge}>
           <Text style={styles.secondaryText}>Play a friend</Text>
+        </Tappable>
+        <Tappable style={[styles.btn, styles.secondary]} onPress={onRooms}>
+          <Text style={styles.secondaryText}>Live rooms</Text>
         </Tappable>
         <Tappable style={[styles.btn, styles.secondary]} onPress={onStats}>
           <Text style={styles.secondaryText}>Stats</Text>

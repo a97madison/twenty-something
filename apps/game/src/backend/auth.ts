@@ -56,3 +56,16 @@ export async function getIdToken(store: KeyValueStore): Promise<string> {
   await store.setItem(REFRESH_KEY, j.refreshToken);
   return cached.idToken;
 }
+
+/** Decode the uid (sub) from a Firebase ID token's JWT payload — no verification
+ *  needed client-side (the server re-verifies); we just need to know who we are. */
+function uidFromToken(idToken: string): string {
+  const payload = idToken.split(".")[1] ?? "";
+  const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+  return (JSON.parse(json).user_id as string) ?? (JSON.parse(json).sub as string) ?? "";
+}
+
+/** This device's anonymous uid (so the rooms UI can tell which player is "me"). */
+export async function getUid(store: KeyValueStore): Promise<string> {
+  return uidFromToken(await getIdToken(store));
+}

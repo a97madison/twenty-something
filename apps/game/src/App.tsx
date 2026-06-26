@@ -58,8 +58,9 @@ import { StatsScreen } from "./screens/StatsScreen";
 import { InstructionsScreen } from "./screens/InstructionsScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { PrivacyScreen } from "./screens/PrivacyScreen";
+import { RoomsScreen } from "./screens/RoomsScreen";
 
-type Screen = "home" | "setup" | "challenge" | "game" | "summary" | "stats" | "instructions" | "settings" | "privacy";
+type Screen = "home" | "setup" | "challenge" | "game" | "summary" | "stats" | "instructions" | "settings" | "privacy" | "rooms";
 type Mode = "practice" | "daily" | "challenge";
 
 /** Everything a friend-challenge game needs beyond its dealt hands. */
@@ -372,6 +373,7 @@ export default function App() {
               setScreen("challenge");
             }}
             onStats={() => setScreen("stats")}
+            onRooms={() => setScreen("rooms")}
             onInstructions={() => setScreen("instructions")}
             onSettings={() => setScreen("settings")}
             dailyDone={isDailyDone(dailyDoneKey, localDayKey())}
@@ -431,6 +433,7 @@ export default function App() {
           />
         )}
         {screen === "privacy" && <PrivacyScreen onBack={() => setScreen("settings")} />}
+        {screen === "rooms" && <RoomsScreen variant="24" onBack={() => setScreen("home")} />}
       </View>
     </SafeAreaProvider>
   );
