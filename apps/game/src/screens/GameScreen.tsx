@@ -27,6 +27,7 @@ import {
   type DealtHand,
 } from "../logic";
 import { formatClock, tokenStr, wrongFeedbackText } from "./format";
+import { WinFlourish } from "./WinFlourish";
 
 const SUITS: SuitData[] = [
   { s: "♠", red: false },
@@ -38,6 +39,9 @@ const SUITS: SuitData[] = [
 /** How long the result/reveal lingers before auto-advancing (tap skips it). */
 const DWELL_OK_MS = 850;
 const DWELL_BAD_MS = 2600;
+
+/** A SOLVE worth this many stars (≈ solved in ≤16s) earns the win flourish. */
+const FLOURISH_STARS = 4.5;
 
 /** True when the next token must be an OPERAND (a card or "(") — start of the
  * expression, or right after an operator or an opening paren. */
@@ -88,6 +92,10 @@ export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayK
   const [feedback, setFeedback] = useState<CalcPadFeedback | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [tick, setTick] = useState<number>(() => now());
+  // A fast, near-perfect solve fires a one-shot celebration overlay; the nonce
+  // re-mounts it so each great solve replays from the start.
+  const [celebrate, setCelebrate] = useState(false);
+  const flourishNonce = useRef(0);
 
   // Live timer — paused while a result is held on screen.
   useEffect(() => {
@@ -133,6 +141,7 @@ export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayK
     const { next } = pending;
     setPending(null);
     setFeedback(null);
+    setCelebrate(false);
     setTokens([]);
     if (next.done) onDone(next);
     else setGame({ ...next, handStartedAt: now() }); // restart the clock for the fresh hand
@@ -152,9 +161,16 @@ export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayK
     const expr = fillValues(tree, values);
     const out = submitSolution(game, expr, now(), dayKey());
     if (out.solved) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       pulse("ok");
       setFeedback({ kind: "ok", text: `solved in ${(out.elapsedMs / 1000).toFixed(1)}s · ★ ${out.stars.toFixed(1)}` });
+      if (out.stars >= FLOURISH_STARS) {
+        // Fast, near-perfect solve: extra haptic punch + the celebration overlay.
+        flourishNonce.current += 1;
+        setCelebrate(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
       settle(out.state, "ok");
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -273,6 +289,10 @@ export function GameScreen({ variant, hands, initialStats, onDone, onStats, dayK
             <Text style={styles.curtainHint}>{pending.next.done ? "tap to see results" : "tap to continue"}</Text>
           </Pressable>
         )}
+
+        {/* Celebration for a fast solve — over the curtain, but pointer-events
+            off so the tap-to-continue underneath still works. */}
+        {celebrate && <WinFlourish key={flourishNonce.current} />}
       </View>
     </SafeAreaView>
   );
