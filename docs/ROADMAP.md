@@ -143,3 +143,26 @@ Highest-ROI next additions, in order:
 | Notifications — OS delivery | ⛔ needs `expo-notifications` + a dev build to verify firing |
 | App Check (abuse hardening) | ⛔ needs the EAS dev build (App Attest / Play Integrity) — see §3 |
 | Store distribution | ⏳ needs EAS + store accounts |
+
+## 7. App-grade hardening (stage 4) — SHIPPED this pass
+
+The "well-rounded app" layer around the game, all pure-client / no new deps:
+- **Settings screen** (⚙ on Home): haptics + sound toggles, 3 notification-category
+  toggles, in-app **Privacy policy**, and **Delete all my data** (wipes AsyncStorage).
+  Haptics toggle is live (GameScreen + CalcPad gate every buzz). Prefs store in
+  engine (tested).
+- **Privacy** — `PRIVACY.md` + in-app screen: anonymous-only, no PII, no trackers,
+  COPPA-safe, deletable. (Still needs hosting + the store data-disclosure form.)
+- **Name moderation** — slurs/hard profanity in challenge display names blanked
+  (leet-normalized), both directions; short false-positive substrings omitted.
+- **Accessibility** — `useReducedMotion()` honored by the card-flip, win flourish,
+  and Summary count-up; non-color ✓/✗ verdict glyph.
+- **Onboarding** — first launch auto-opens the how-to once.
+- **Empty states** — Stats shows "No games yet" for fresh players.
+- **CI** — GitHub Action (Node 22): `npm ci → typecheck → test` on push/PR.
+- **Notifications** — brain extended (freeze-aware + perfect-week carrot). Delivery
+  still ⛔ on the dev build; **social notifications (challenge accepted / rival
+  passed you) remain unbuilt — they need server-side push, not local scheduling.**
+
+Still open in stage 4 (not yet built): **analytics + crash reporting** (JS-capable
+pre-dev-build), store legal/assets, and the social-push architecture.
