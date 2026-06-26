@@ -142,6 +142,33 @@ export function decodeChallenge(code: string): Challenge | null {
   return { seed, variant, hands: n, rating: r10 / 10, name, ...(playerId ? { playerId } : {}) };
 }
 
+// --- Shareable links ----------------------------------------------------------
+//
+// A tappable URL beats "paste this weird code": a friend taps it and lands
+// straight in the accept flow (in-browser on the web build; via the app's deep
+// link on native). The code rides in a `c=` query param so it works at any host.
+
+/** Brandable base for challenge links (point this at the deployed web app). */
+export const CHALLENGE_URL_BASE = "https://twentysomething.app";
+
+/** Build a shareable challenge link from a code. */
+export function challengeUrl(code: string): string {
+  return `${CHALLENGE_URL_BASE}/?c=${encodeURIComponent(code)}`;
+}
+
+/**
+ * Pull a challenge code out of pasted text — a full link (`…?c=CODE`) or a bare
+ * code. Returns the raw code string (still run it through `decodeChallenge` to
+ * validate), or null if there's nothing code-shaped.
+ */
+export function extractChallengeCode(input: string): string | null {
+  if (typeof input !== "string") return null;
+  const s = input.trim();
+  const m = s.match(/[?&]c=([^&\s]+)/);
+  if (m) return decodeURIComponent(m[1]!);
+  return /^TS\d\./.test(s) ? s : null;
+}
+
 /** Head-to-head verdict from the recipient's point of view. */
 export interface ChallengeOutcome {
   result: "win" | "loss" | "tie";

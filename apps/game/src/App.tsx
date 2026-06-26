@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Linking, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import type { Variant } from "@twenty-something/core";
@@ -27,6 +27,8 @@ import {
   emptyRivals,
   randomPlayerId,
   challengeOutcome,
+  decodeChallenge,
+  extractChallengeCode,
   loadPrefs,
   savePrefs,
   defaultPrefs,
@@ -144,13 +146,6 @@ export default function App() {
     loadPrefs(storage).then((p) => {
       if (alive) setPrefs(p);
     });
-    // First launch → show the how-to once, then never auto-open it again.
-    storage.getItem(ONBOARDED_KEY).then((v) => {
-      if (alive && !v) {
-        setScreen("instructions");
-        storage.setItem(ONBOARDED_KEY, "1").catch(() => {});
-      }
-    });
     // A stable per-device id for friend records — created once, then persisted.
     storage.getItem(PLAYER_ID_KEY).then((id) => {
       if (!alive) return;
@@ -238,6 +233,46 @@ export default function App() {
       },
     });
   };
+
+  // Decode a challenge from a link/text, or null.
+  const challengeFromUrl = (url: string | null | undefined): Challenge | null => {
+    const code = url ? extractChallengeCode(url) : null;
+    return code ? decodeChallenge(code) : null;
+  };
+
+  // Launch routing: an incoming challenge link wins; otherwise show the first-run
+  // how-to. Runs once. Also listens for links tapped while the app is open.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const webUrl = typeof window !== "undefined" ? window.location?.href : null;
+      const nativeUrl = await Linking.getInitialURL().catch(() => null);
+      const incoming = challengeFromUrl(webUrl) ?? challengeFromUrl(nativeUrl);
+      if (cancelled) return;
+      if (incoming) {
+        // Clean the web address bar so a refresh doesn't replay the challenge.
+        if (typeof window !== "undefined" && window.history?.replaceState) {
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+        startChallengeAccept(incoming);
+        return;
+      }
+      const onboarded = await storage.getItem(ONBOARDED_KEY).catch(() => "1");
+      if (cancelled) return;
+      if (!onboarded) {
+        setScreen("instructions");
+        storage.setItem(ONBOARDED_KEY, "1").catch(() => {});
+      }
+    })();
+    const sub = Linking.addEventListener("url", (e) => {
+      const ch = challengeFromUrl(e.url);
+      if (ch) startChallengeAccept(ch);
+    });
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, []);
 
   const finishGame = (finalState: GameState) => {
     if (!config) return;

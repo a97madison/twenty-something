@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { dealSeededHands } from "./engine.ts";
-import { encodeChallenge, decodeChallenge, challengeOutcome, type Challenge } from "./challenge.ts";
+import { encodeChallenge, decodeChallenge, challengeOutcome, challengeUrl, extractChallengeCode, type Challenge } from "./challenge.ts";
 
 const sample: Challenge = { seed: "k3f9q2z1", variant: "20_something", hands: 5, rating: 3.8, name: "Riley" };
 
@@ -91,6 +91,22 @@ test("decode rejects out-of-range numbers", () => {
 
 test("decode tolerates surrounding whitespace", () => {
   assert.equal(decodeChallenge("  TS1.24.abc.5.30.x  \n")?.seed, "abc");
+});
+
+test("a challenge link round-trips back to the code", () => {
+  const code = encodeChallenge(sample);
+  const url = challengeUrl(code);
+  assert.ok(url.startsWith("https://"));
+  assert.equal(extractChallengeCode(url), code);
+  // ...and the extracted code still decodes to the original challenge.
+  assert.deepEqual(decodeChallenge(extractChallengeCode(url)!), sample);
+});
+
+test("extractChallengeCode handles bare codes, links, and junk", () => {
+  assert.equal(extractChallengeCode("TS2.24.abc.5.40.id.Jo"), "TS2.24.abc.5.40.id.Jo");
+  assert.equal(extractChallengeCode("  https://x.app/?c=TS1.24.abc.5.40.Jo&utm=1 "), "TS1.24.abc.5.40.Jo");
+  assert.equal(extractChallengeCode("hey check this out"), null);
+  assert.equal(extractChallengeCode(""), null);
 });
 
 test("challengeOutcome: win, loss, and a near-equal tie", () => {

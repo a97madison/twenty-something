@@ -10,6 +10,7 @@ import {
   weeklyRollup,
   msUntilWeeklyReset,
   encodeChallenge,
+  challengeUrl,
   challengeOutcome,
   type AllStats,
   type DailyStreakEvent,
@@ -162,8 +163,8 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
     });
     const message = [
       `I scored ${sessionRating.toFixed(1)}★ on a ${variantLabel(variant)} challenge — same ${challenge!.hands} hands. Can you beat me?`,
-      `Open 20·Something → Play a friend → Enter a code:`,
-      code,
+      `Tap to play the exact same hands:`,
+      challengeUrl(code),
     ].join("\n");
     Share.share({ message }).catch(() => {});
   };

@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Variant } from "@twenty-something/core";
 import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
-import { decodeChallenge, type Challenge } from "../logic";
+import { decodeChallenge, extractChallengeCode, type Challenge } from "../logic";
 import { variantLabel } from "./format";
 
 /** Hand-count choices for a friend challenge. */
@@ -41,7 +41,9 @@ export function ChallengeScreen({ defaultName = "", initialView = "hub", onCreat
 
   const tryAccept = () => {
     Keyboard.dismiss();
-    const challenge = decodeChallenge(code);
+    // Accept either a pasted code or a full challenge link.
+    const extracted = extractChallengeCode(code);
+    const challenge = extracted ? decodeChallenge(extracted) : null;
     if (!challenge) {
       setError("That code doesn't look right. Check it and try again.");
       return;
@@ -138,7 +140,7 @@ export function ChallengeScreen({ defaultName = "", initialView = "hub", onCreat
             onSubmitEditing={tryAccept}
           />
           {error && <Text style={styles.error}>{error}</Text>}
-          <Text style={styles.hint}>Paste the code a friend sent you to play their exact hands.</Text>
+          <Text style={styles.hint}>Paste the code or link a friend sent you to play their exact hands.</Text>
           <Tappable style={[styles.btn, styles.primary, styles.cta]} onPress={tryAccept}>
             <Text style={styles.primaryText}>Play it</Text>
           </Tappable>
