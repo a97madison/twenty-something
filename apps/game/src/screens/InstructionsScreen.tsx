@@ -17,9 +17,14 @@ export function InstructionsScreen({ onBack }: Props) {
         <Text style={styles.title}>How to play</Text>
 
         <Para>
-          Four cards are dealt. Combine all four — using <Em>+ − × ÷</Em> and parentheses, each card exactly
-          once — to hit the target shown in the green pill.
+          Four cards are dealt. Use each card exactly once to solve for the target number.
         </Para>
+
+        <View style={styles.example}>
+          <Text style={styles.exampleLabel}>EXAMPLE</Text>
+          <Text style={styles.exampleCards}>7   3   8   2</Text>
+          <Text style={styles.exampleTarget}>make 24</Text>
+        </View>
 
         <Section title="The two variants">
           <Para>
@@ -32,19 +37,10 @@ export function InstructionsScreen({ onBack }: Props) {
         </Section>
 
         <Section title="But it might be impossible">
-          <Para>
-            Hands are dealt naturally, so some have no solution at all. Your job is to <Em>judge</Em> each hand:
-          </Para>
+          <Para>Some hands have no solution, you can:</Para>
           <Bullet>Build an expression and press <Em>=</Em> to commit it.</Bullet>
           <Bullet><Em>No solution</Em> — claim the hand can't be made. Right only if it truly can't.</Bullet>
-          <Bullet><Em>Pass</Em> — give up; the answer is revealed and your streak breaks.</Bullet>
-        </Section>
-
-        <Section title="Your rating">
-          <Para>
-            Every hand earns up to <Em>★ 5</Em>: half for being right, half for being fast. Your rating is the
-            average over all your hands — tracked separately for each variant, all-time and this week.
-          </Para>
+          <Bullet><Em>Pass</Em> — give up; your streak breaks.</Bullet>
         </Section>
       </ScrollView>
     </SafeAreaView>
@@ -90,4 +86,17 @@ const styles = StyleSheet.create({
   bulletDot: { fontFamily: fonts.sans, fontSize: 15, color: colors.accent, lineHeight: 23 },
   bulletText: { flex: 1, fontFamily: fonts.sans, fontSize: 15, lineHeight: 23, color: colors.inkDim },
   em: { color: colors.ink, fontWeight: "600" },
+  example: {
+    marginTop: 14,
+    paddingVertical: 16,
+    borderRadius: radius.md,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line2,
+    alignItems: "center",
+    gap: 6,
+  },
+  exampleLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.4, color: colors.inkFaint },
+  exampleCards: { fontFamily: fonts.serifBold, fontSize: 28, letterSpacing: 4, color: colors.ink },
+  exampleTarget: { fontFamily: fonts.mono, fontSize: 15, color: colors.accent },
 });

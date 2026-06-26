@@ -164,7 +164,7 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
       playerId: challenge!.myPlayerId,
     });
     const message = [
-      `I scored ${sessionRating.toFixed(1)}★ on a ${variantLabel(variant)} challenge — same ${challenge!.hands} hands. Can you beat me?`,
+      `I scored ${sessionRating.toFixed(1)}★ on a ${variantLabel(variant)} challenge! Can you beat me on these ${challenge!.hands} hands?`,
       `Tap to play the exact same hands:`,
       challengeUrl(code),
     ].join("\n");

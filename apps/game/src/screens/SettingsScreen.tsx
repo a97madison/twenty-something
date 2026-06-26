@@ -41,8 +41,6 @@ export function SettingsScreen({ prefs, onChange, onDeleteData, onPrivacy, onBac
         <Text style={styles.section}>FEEDBACK</Text>
         <View style={styles.card}>
           <Row label="Haptics" sub="Taps and verdicts buzz" value={prefs.haptics} onValueChange={(v) => set({ haptics: v })} />
-          <View style={styles.hr} />
-          <Row label="Sound" sub="Coming with the next update" value={prefs.sound} onValueChange={(v) => set({ sound: v })} />
         </View>
 
         <Text style={styles.section}>NOTIFICATIONS</Text>
@@ -51,7 +49,7 @@ export function SettingsScreen({ prefs, onChange, onDeleteData, onPrivacy, onBac
           <View style={styles.hr} />
           <Row label="Streak alerts" sub="Before a live streak lapses" value={prefs.notifyStreak} onValueChange={(v) => set({ notifyStreak: v })} />
           <View style={styles.hr} />
-          <Row label="Weekly recap" sub="Your week, when the season resets" value={prefs.notifyWeekly} onValueChange={(v) => set({ notifyWeekly: v })} />
+          <Row label="Weekly recap" value={prefs.notifyWeekly} onValueChange={(v) => set({ notifyWeekly: v })} />
         </View>
         <Text style={styles.note}>Notifications start delivering in an upcoming build; your choices are saved.</Text>
 
@@ -73,12 +71,12 @@ export function SettingsScreen({ prefs, onChange, onDeleteData, onPrivacy, onBac
   );
 }
 
-function Row({ label, sub, value, onValueChange }: { label: string; sub: string; value: boolean; onValueChange: (v: boolean) => void }) {
+function Row({ label, sub, value, onValueChange }: { label: string; sub?: string; value: boolean; onValueChange: (v: boolean) => void }) {
   return (
     <View style={styles.row}>
       <View style={styles.rowText}>
         <Text style={styles.rowLabel}>{label}</Text>
-        <Text style={styles.rowSub}>{sub}</Text>
+        {sub && <Text style={styles.rowSub}>{sub}</Text>}
       </View>
       <Switch
         value={value}

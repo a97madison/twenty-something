@@ -104,21 +104,20 @@ export function CalcPad({
 
   return (
     <View>
-      {/* Expression "display" + the green target pill. */}
+      {/* Expression "display" + the green target pill. The expression wraps so a
+          long one shows in full; backspace lives on its own row below. */}
       <View style={styles.exprRow}>
-        <Text
-          style={expression.length === 0 ? styles.exprPlaceholder : styles.exprText}
-          numberOfLines={1}
-          ellipsizeMode="head"
-        >
+        <Text style={expression.length === 0 ? styles.exprPlaceholder : styles.exprText}>
           {expression.length === 0 ? "tap cards & operators…" : expression}
         </Text>
-        <Tappable style={styles.exprBackspace} onPress={tap(onBackspace)} accessibilityLabel="Backspace">
-          <Text style={styles.exprBackspaceText}>⌫</Text>
-        </Tappable>
         <View style={styles.targetPill} accessibilityLabel={`Make ${target}`}>
           <Text style={styles.targetPillText}>{target}</Text>
         </View>
+      </View>
+      <View style={styles.backspaceRow}>
+        <Tappable style={styles.exprBackspace} onPress={tap(onBackspace)} accessibilityLabel="Backspace">
+          <Text style={styles.exprBackspaceText}>⌫</Text>
+        </Tappable>
       </View>
 
       {/* The calculator block: cards + judge row on the left, operator column on the right. */}
@@ -269,22 +268,23 @@ const styles = StyleSheet.create({
   exprRow: {
     minHeight: 56,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     backgroundColor: colors.panel,
     borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radius.lg,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingLeft: 16,
-    paddingRight: 10,
-    marginBottom: 14,
+    paddingRight: 12,
+    marginBottom: 10,
   },
-  exprText: { flex: 1, fontFamily: fonts.mono, fontSize: 22, color: colors.ink, letterSpacing: 1 },
-  exprPlaceholder: { flex: 1, fontFamily: fonts.sans, fontSize: 14, color: colors.inkFaint },
+  exprText: { flex: 1, fontFamily: fonts.mono, fontSize: 22, lineHeight: 30, color: colors.ink, letterSpacing: 1 },
+  exprPlaceholder: { flex: 1, fontFamily: fonts.sans, fontSize: 14, lineHeight: 30, color: colors.inkFaint },
+  backspaceRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 12 },
   exprBackspace: {
-    width: 46,
-    alignSelf: "stretch",
+    width: 56,
+    height: 40,
     backgroundColor: colors.panel2,
     borderColor: colors.line,
     borderWidth: 1,

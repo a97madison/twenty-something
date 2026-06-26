@@ -841,19 +841,18 @@ function sanitizeStats(x: unknown): AllStats {
 // --- App preferences -----------------------------------------------------------
 //
 // User-controlled toggles. `haptics` is consumed live (the game guards its taps
-// on it); `sound` and the notify* flags are stored for the systems that read
-// them once delivered (sound = expo-av, notify* = the planner's category gates).
+// on it); the notify* flags are stored for the planner's category gates once
+// notification delivery is wired.
 
 export interface Prefs {
   haptics: boolean;
-  sound: boolean;
   notifyDaily: boolean;
   notifyStreak: boolean;
   notifyWeekly: boolean;
 }
 
 export function defaultPrefs(): Prefs {
-  return { haptics: true, sound: true, notifyDaily: true, notifyStreak: true, notifyWeekly: true };
+  return { haptics: true, notifyDaily: true, notifyStreak: true, notifyWeekly: true };
 }
 
 const PREFS_KEY = "twenty-something:prefs";
@@ -880,7 +879,6 @@ function sanitizePrefs(x: unknown): Prefs {
   const bool = (v: unknown, dflt: boolean) => (typeof v === "boolean" ? v : dflt);
   return {
     haptics: bool(o.haptics, d.haptics),
-    sound: bool(o.sound, d.sound),
     notifyDaily: bool(o.notifyDaily, d.notifyDaily),
     notifyStreak: bool(o.notifyStreak, d.notifyStreak),
     notifyWeekly: bool(o.notifyWeekly, d.notifyWeekly),

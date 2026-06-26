@@ -197,7 +197,7 @@ export function GameScreen({ variant, hands, initialStats, haptics = true, onDon
     } else {
       buzzBad();
       pulse("bad");
-      setFeedback({ kind: "bad", text: out.reveal?.solution ? `it was solvable: ${out.reveal.solution}` : "it was solvable" });
+      setFeedback({ kind: "bad", text: "it was solvable" });
       settle(out.state, "bad");
     }
   };
@@ -209,7 +209,7 @@ export function GameScreen({ variant, hands, initialStats, haptics = true, onDon
     pulse("bad");
     setFeedback({
       kind: "bad",
-      text: out.reveal?.solution ? `e.g. ${out.reveal.solution}` : "no solution existed",
+      text: out.reveal?.solution ? "the hand was solvable" : "no solution existed",
     });
     settle(out.state, "bad");
   };
