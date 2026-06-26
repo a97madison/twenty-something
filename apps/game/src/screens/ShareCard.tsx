@@ -36,7 +36,7 @@ function prettyDate(key: string): string {
 export function ShareCard({ data }: { data: ShareCardData }) {
   const { date, rating, solved, total, totalTimeSec, accuracy, streak, percentile } = data;
   return (
-    <View style={styles.card}>
+    <View style={styles.card} testID="share-card">
       <View style={styles.header}>
         <Text style={styles.wordmark}>
           20<Text style={styles.dot}>·</Text>Something

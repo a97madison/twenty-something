@@ -104,7 +104,15 @@ Implementation: `expo-notifications`; calendar trigger for the daily nudge, date
 - **Stores:** iOS App Store + Google Play via EAS Build. ASO around "daily math game / 24 game / math puzzle". Screenshots must lead with the *hook*: the card hand + target + a fast solve time, then the daily/streak/stats. App icon = the felt-green wordmark.
 - **Soft launch:** TestFlight + Play internal testing with 20–50 people; watch D1/D7 retention and daily-completion rate before paid anything.
 - **Launch channels (free, intent-matched):** Product Hunt; r/math, r/puzzles, r/iosgaming; math-teacher / mental-math TikTok & Shorts (a 10-sec "can you make 24?" clip is the whole ad). Wordle proved daily-puzzle word-of-mouth needs no spend.
-- **Viral loop:** `@twenty-something/core` **already has an outcome-only share builder** (time/streak/rarity, never the method — Wordle-style, no spoilers) that the app currently doesn't surface. Add a **Share** button on the daily Summary → this is the single highest-leverage growth feature and is mostly built. (Open product call: a 5-hand daily needs a share format — lead with total time + accuracy + percentile.)
+- **Viral loop:** outcome-only text share is SHIPPED (`buildDailyShareText`). The
+  next step is the **image share card** (the Wordle-grid moment, the real growth
+  engine): a branded `ShareCard` component is BUILT and previewed on the daily
+  summary ("YOUR CARD" — wordmark/date/stars/solved/⚡🎯🔥 chips/🏅percentile,
+  spoiler-free). It's pure views with NO new deps so it renders now; turning it
+  into an actual shared PNG needs **`react-native-view-shot`** (`captureRef` →
+  `expo-sharing`/`Share`): on WEB it works immediately, on native it needs the
+  EAS dev build (native module). Bundle that dep decision with the dev-build
+  milestone. Then a 1080² PNG of the card is the postable artifact.
 - **Retention engine:** daily streak + the two notifications + the weekly rating reset + percentile bragging. These compound.
 
 ## 6. Addiction loop — what's working and what's next
