@@ -46,12 +46,38 @@ const MAX_ID = 12;
 const VARIANT_TO_CODE: Record<Variant, string> = { "24": "24", "20_something": "20" };
 const CODE_TO_VARIANT: Record<string, Variant> = { "24": "24", "20": "20_something" };
 
-/** Strip anything that would break the delimited format or bloat the code. */
+// A basic blocklist (lowercased, leet-normalized) so a friend's display name —
+// which renders on YOUR screen — can't be a slur or hard profanity. Not
+// exhaustive moderation; it blanks the worst, gracefully (→ "Anonymous").
+// Longer/unambiguous terms only — short substrings like "dick"/"fag"/"spic"
+// would false-positive real names (Dickson, Fagan, Spicer), so they're omitted.
+const BLOCKED = [
+  "fuck", "shit", "cunt", "bitch", "pussy", "nigger", "nigga", "faggot",
+  "retard", "whore", "kike", "tranny",
+];
+
+/** Lower + collapse common leetspeak so "n1gg3r" matches "nigger". */
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/0/g, "o")
+    .replace(/1/g, "i")
+    .replace(/3/g, "e")
+    .replace(/4/g, "a")
+    .replace(/5/g, "s")
+    .replace(/7/g, "t")
+    .replace(/[^a-z]/g, "");
+}
+
+function isBlockedName(name: string): boolean {
+  const n = normalizeForMatch(name);
+  return BLOCKED.some((b) => n.includes(b));
+}
+
+/** Strip delimiter-breaking chars, cap length, and blank obviously offensive names. */
 function sanitizeName(name: string): string {
-  return name
-    .replace(/[.\n\r]/g, " ")
-    .trim()
-    .slice(0, MAX_NAME);
+  const clean = name.replace(/[.\n\r]/g, " ").trim().slice(0, MAX_NAME);
+  return isBlockedName(clean) ? "" : clean;
 }
 
 /** Strip a base36 id field to its safe charset, capped. */

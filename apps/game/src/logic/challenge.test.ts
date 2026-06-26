@@ -65,6 +65,17 @@ test("names are sanitized: separators stripped, length capped", () => {
   assert.ok(c!.name.length <= 16, "name capped");
 });
 
+test("offensive names are blanked, on encode and decode", () => {
+  // A clean name passes through.
+  assert.equal(decodeChallenge(encodeChallenge({ ...sample, name: "Riley" }))?.name, "Riley");
+  // A slur is blanked when encoding...
+  assert.equal(decodeChallenge(encodeChallenge({ ...sample, name: "f4ggot" }))?.name, "");
+  // ...and when decoding a hand-typed code.
+  assert.equal(decodeChallenge("TS2.24.abc123.5.40.ab12cd.b1tch")?.name, "");
+  // Real names that merely contain a short substring are NOT blocked.
+  assert.equal(decodeChallenge(encodeChallenge({ ...sample, name: "Dickson" }))?.name, "Dickson");
+});
+
 test("decode rejects junk, never throws", () => {
   for (const junk of ["", "hello", "TS1.20", "TS0.24.abc.5.30.x", "TS1.99.abc.5.30.x", "TS1.24.@@@.5.30.x"]) {
     assert.equal(decodeChallenge(junk), null, `should reject: ${junk}`);
