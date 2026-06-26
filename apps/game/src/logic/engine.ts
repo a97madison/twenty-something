@@ -575,6 +575,153 @@ export function isDailyDone(lastDailyKey: string | null, todayKey: string): bool
   return lastDailyKey === todayKey;
 }
 
+// --- Daily streak (consecutive days) with freeze protection --------------------
+//
+// The retention spine: a streak of consecutive days completing the daily, plus
+// "streak freezes" that auto-bridge a missed day so one slip doesn't wipe a long
+// run (pure loss-aversion — see ROADMAP §6 #3). A freeze is EARNED each "perfect
+// week" (every 7-day multiple), banked up to a small cap. Everything is keyed by
+// the local dayKey the screen supplies, so this stays pure and timezone-free.
+
+/** Most freezes a player can bank. */
+export const MAX_FREEZES = 2;
+/** Streak length that completes a "perfect week" and earns a freeze. */
+export const PERFECT_WEEK = 7;
+
+export interface DailyStreak {
+  /** Consecutive days the daily was completed. */
+  current: number;
+  /** Best streak ever reached. */
+  best: number;
+  /** The last dayKey the daily was completed, or null if never. */
+  lastDate: string | null;
+  /** Banked streak freezes. */
+  freezes: number;
+  /** Lifetime count of perfect weeks reached. */
+  perfectWeeks: number;
+}
+
+export function emptyDailyStreak(): DailyStreak {
+  return { current: 0, best: 0, lastDate: null, freezes: 0, perfectWeeks: 0 };
+}
+
+/** What happened on a daily completion — drives the summary's messaging. */
+export interface DailyStreakEvent {
+  kind: "first" | "extended" | "frozen" | "reset" | "same_day";
+  /** Missed days bridged by spending freezes (0 unless `kind === "frozen"`). */
+  freezesUsed: number;
+  /** A perfect week just banked a freeze. */
+  earnedFreeze: boolean;
+  /** The streak just reached a 7-day multiple. */
+  perfectWeek: boolean;
+}
+
+function finalizeStreak(
+  prev: DailyStreak,
+  current: number,
+  freezesUsed: number,
+  kind: DailyStreakEvent["kind"],
+  todayKey: string,
+): { state: DailyStreak; event: DailyStreakEvent } {
+  const perfectWeek = current > 0 && current % PERFECT_WEEK === 0;
+  let freezes = prev.freezes - freezesUsed;
+  const earnedFreeze = perfectWeek && freezes < MAX_FREEZES;
+  if (earnedFreeze) freezes += 1;
+  const state: DailyStreak = {
+    current,
+    best: Math.max(prev.best, current),
+    lastDate: todayKey,
+    freezes,
+    perfectWeeks: prev.perfectWeeks + (perfectWeek ? 1 : 0),
+  };
+  return { state, event: { kind, freezesUsed, earnedFreeze, perfectWeek } };
+}
+
+/**
+ * Record that the player completed the daily on `todayKey`. Extends the streak
+ * if it's the next day, bridges a gap with freezes if there are enough, else
+ * resets to 1. Pure — returns the next state plus what happened.
+ */
+export function recordDailyPlay(state: DailyStreak, todayKey: string): { state: DailyStreak; event: DailyStreakEvent } {
+  if (state.lastDate === null) {
+    return finalizeStreak(state, 1, 0, "first", todayKey);
+  }
+  const gap = epochDayFromKey(todayKey) - epochDayFromKey(state.lastDate);
+  if (gap <= 0) {
+    // Already counted today (the daily is gated to one play/day) — no change.
+    return { state, event: { kind: "same_day", freezesUsed: 0, earnedFreeze: false, perfectWeek: false } };
+  }
+  if (gap === 1) {
+    return finalizeStreak(state, state.current + 1, 0, "extended", todayKey);
+  }
+  const missed = gap - 1; // gap >= 2
+  if (state.freezes >= missed) {
+    return finalizeStreak(state, state.current + 1, missed, "frozen", todayKey);
+  }
+  return finalizeStreak(state, 1, 0, "reset", todayKey);
+}
+
+/** Live, display-only view of where the streak stands as of `todayKey`. */
+export interface DailyStreakStatus {
+  /** The streak as it stands today — 0 if it has lapsed beyond freeze coverage. */
+  current: number;
+  freezes: number;
+  /** Today's daily is already done. */
+  playedToday: boolean;
+  /** The streak is still going (or recoverable by playing today). */
+  alive: boolean;
+  /** Alive but unplayed today — play to keep it. */
+  atRisk: boolean;
+}
+
+/**
+ * Where the streak stands as of `todayKey`, WITHOUT mutating — for Home/Stats.
+ * Mirrors `recordDailyPlay`'s rules so the displayed streak matches what a play
+ * today would produce.
+ */
+export function dailyStreakStatus(state: DailyStreak, todayKey: string): DailyStreakStatus {
+  const base = { current: state.current, freezes: state.freezes };
+  if (state.lastDate === null) {
+    return { ...base, current: 0, playedToday: false, alive: false, atRisk: false };
+  }
+  const gap = epochDayFromKey(todayKey) - epochDayFromKey(state.lastDate);
+  if (gap <= 0) return { ...base, playedToday: true, alive: true, atRisk: false };
+  if (gap === 1) return { ...base, playedToday: false, alive: true, atRisk: true };
+  const missed = gap - 1;
+  if (state.freezes >= missed) return { ...base, playedToday: false, alive: true, atRisk: true };
+  return { ...base, current: 0, playedToday: false, alive: false, atRisk: false };
+}
+
+const DAILY_STREAK_KEY = "twenty-something:daily-streak";
+
+/** Load the saved daily streak, fresh on missing/corrupt data. */
+export async function loadDailyStreak(store: KeyValueStore): Promise<DailyStreak> {
+  const raw = await store.getItem(DAILY_STREAK_KEY);
+  if (raw === null) return emptyDailyStreak();
+  try {
+    return sanitizeDailyStreak(JSON.parse(raw));
+  } catch {
+    return emptyDailyStreak();
+  }
+}
+
+/** Persist the daily streak as JSON. */
+export async function saveDailyStreak(store: KeyValueStore, state: DailyStreak): Promise<void> {
+  await store.setItem(DAILY_STREAK_KEY, JSON.stringify(state));
+}
+
+function sanitizeDailyStreak(x: unknown): DailyStreak {
+  const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
+  const ld = o.lastDate;
+  return {
+    current: Math.floor(num(o.current)),
+    best: Math.floor(num(o.best)),
+    lastDate: typeof ld === "string" ? ld : null,
+    freezes: Math.min(MAX_FREEZES, Math.floor(num(o.freezes))),
+    perfectWeeks: Math.floor(num(o.perfectWeeks)),
+  };
+}
+
 function num(x: unknown, floor = 0): number {
   return typeof x === "number" && Number.isFinite(x) && x >= floor ? x : floor;
 }

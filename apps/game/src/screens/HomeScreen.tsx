@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, fonts, radius, shadows, Tappable } from "@twenty-something/ui";
 
+import type { DailyStreakStatus } from "../logic";
 import { formatHoursMinutes, msUntilLocalMidnight } from "./format";
 
 interface Props {
@@ -12,10 +13,13 @@ interface Props {
   onInstructions: () => void;
   /** True once today's daily has been played — locks the Daily button. */
   dailyDone?: boolean;
+  /** Live daily-streak status for the streak banner. */
+  streak?: DailyStreakStatus;
 }
 
 /** Landing screen: brand, the entry points, and the "i" → Instructions. */
-export function HomeScreen({ onPlay, onDaily, onChallenge, onStats, onInstructions, dailyDone }: Props) {
+export function HomeScreen({ onPlay, onDaily, onChallenge, onStats, onInstructions, dailyDone, streak }: Props) {
+  const showStreak = streak && streak.alive && streak.current >= 1;
   return (
     <SafeAreaView style={styles.safe}>
       <Tappable style={styles.info} onPress={onInstructions} hitSlop={12} accessibilityLabel="How to play">
@@ -26,6 +30,14 @@ export function HomeScreen({ onPlay, onDaily, onChallenge, onStats, onInstructio
         <Text style={styles.wordmark}>
           20<Text style={styles.dot}>·</Text>Something
         </Text>
+        {showStreak && (
+          <View style={styles.streak} accessibilityLabel={`${streak!.current} day streak`}>
+            <Text style={styles.streakNum}>🔥 {streak!.current}</Text>
+            <Text style={styles.streakLabel}>day streak</Text>
+            {streak!.freezes > 0 && <Text style={styles.streakFreeze}>{"❄️".repeat(streak!.freezes)}</Text>}
+          </View>
+        )}
+        {showStreak && streak!.atRisk && <Text style={styles.streakHint}>Play today to keep it going</Text>}
       </View>
 
       <View style={styles.menu}>
@@ -70,6 +82,11 @@ const styles = StyleSheet.create({
   hero: { flex: 1, justifyContent: "center", alignItems: "center" },
   wordmark: { fontFamily: fonts.serifBold, fontSize: 40, color: colors.ink },
   dot: { color: colors.accent },
+  streak: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 22 },
+  streakNum: { fontFamily: fonts.serifBold, fontSize: 22, color: colors.ink },
+  streakLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.inkDim },
+  streakFreeze: { fontSize: 14 },
+  streakHint: { fontFamily: fonts.sans, fontSize: 12, color: colors.inkFaint, marginTop: 6 },
   menu: { paddingBottom: 48, gap: 12 },
   btn: { paddingVertical: 17, borderRadius: radius.md, alignItems: "center" },
   btnDisabled: { opacity: 0.5 },

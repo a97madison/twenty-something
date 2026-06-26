@@ -12,6 +12,7 @@ import {
   encodeChallenge,
   challengeOutcome,
   type AllStats,
+  type DailyStreakEvent,
   type GameState,
 } from "../logic";
 import { storage } from "../storage";
@@ -44,12 +45,14 @@ interface Props {
   dayKey: string;
   /** Present only for friend challenges — drives the head-to-head / share-code. */
   challenge?: ChallengeContext;
+  /** Daily only: the streak after this play + what happened. */
+  dailyStreak?: { current: number; freezes: number; event: DailyStreakEvent };
   onPlayAgain: () => void;
   onHome: () => void;
 }
 
 /** End-of-game summary: this session's results plus the all-time / weekly rating block. */
-export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey, challenge, onPlayAgain, onHome }: Props) {
+export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey, challenge, dailyStreak, onPlayAgain, onHome }: Props) {
   const s = finalState.session;
   const sessionRating = s.total === 0 ? null : s.starSum / s.total;
   const sessionAccuracy = s.total === 0 ? null : s.correct / s.total;
@@ -98,10 +101,20 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
       total: s.total,
       stars: sessionRating ?? undefined,
       totalTimeSec: s.timeSumCorrect > 0 ? Math.round(s.timeSumCorrect / 1000) : undefined,
-      currentStreak: finalState.streak,
+      currentStreak: dailyStreak?.current ?? 0,
     });
     Share.share({ message }).catch(() => {});
   };
+
+  // --- Daily streak message ----------------------------------------------------
+  const streakMsg = (() => {
+    if (!dailyStreak) return null;
+    const { current, event } = dailyStreak;
+    if (event.earnedFreeze) return `🎉 Perfect week! ${current}-day streak · banked a freeze`;
+    if (event.kind === "frozen") return `❄️ Freeze used — your ${current}-day streak is safe`;
+    if (event.kind === "reset") return `Streak reset — day ${current} of a new run`;
+    return `🔥 ${current} day streak`;
+  })();
 
   // --- Friend challenge --------------------------------------------------------
   const isCreate = challenge?.role === "create";
@@ -195,6 +208,20 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
           </View>
         )}
 
+        {streakMsg && (
+          <View
+            style={[styles.streakCard, dailyStreak!.event.earnedFreeze && styles.streakCardWin]}
+            accessibilityLabel="streak"
+          >
+            <Text style={styles.streakMsg}>{streakMsg}</Text>
+            {dailyStreak!.freezes > 0 && (
+              <Text style={styles.streakShields}>
+                {"❄️".repeat(dailyStreak!.freezes)} {dailyStreak!.freezes} freeze{dailyStreak!.freezes === 1 ? "" : "s"} banked
+              </Text>
+            )}
+          </View>
+        )}
+
         {/* All-time rating: previous → Δ → new. */}
         <Text style={styles.section}>ALL-TIME RATING · {variantLabel(variant)}</Text>
         {allTimeUnlocked ? (
@@ -276,6 +303,10 @@ const styles = StyleSheet.create({
   versusTie: { borderColor: colors.line2 },
   versusVerdict: { fontFamily: fonts.serifBold, fontSize: 17, color: colors.ink, textAlign: "center" },
   versusLine: { fontFamily: fonts.sans, fontSize: 13, color: colors.inkDim, textAlign: "center" },
+  streakCard: { marginTop: 12, padding: 12, borderRadius: radius.md, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2, alignItems: "center", gap: 3, ...shadows.soft },
+  streakCardWin: { borderColor: colors.accent },
+  streakMsg: { fontFamily: fonts.serifSemibold, fontSize: 15, color: colors.ink, textAlign: "center" },
+  streakShields: { fontFamily: fonts.sans, fontSize: 12, color: colors.inkDim },
   percentile: { marginTop: 14, padding: 12, borderRadius: radius.md, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.line },
   percentileText: { fontFamily: fonts.sans, fontSize: 12, color: colors.inkDim, textAlign: "center" },
   percentileBig: { fontFamily: fonts.serifBold, fontSize: 15, color: colors.accent, textAlign: "center" },

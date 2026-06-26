@@ -15,10 +15,17 @@ import {
   loadDailyDone,
   saveDailyDone,
   isDailyDone,
+  loadDailyStreak,
+  saveDailyStreak,
+  recordDailyPlay,
+  dailyStreakStatus,
+  emptyDailyStreak,
   emptyStats,
   DAILY_HANDS,
   type AllStats,
   type Challenge,
+  type DailyStreak,
+  type DailyStreakEvent,
   type DealtHand,
   type GameState,
 } from "./logic";
@@ -69,6 +76,8 @@ interface SummaryData {
   finalState: GameState;
   dayKey: string;
   challenge?: ChallengeContext;
+  /** Daily only: the streak after this play + what happened (for messaging). */
+  dailyStreak?: { current: number; freezes: number; event: DailyStreakEvent };
 }
 
 export default function App() {
@@ -84,6 +93,8 @@ export default function App() {
   const [dailyDoneKey, setDailyDoneKey] = useState<string | null>(null);
   // Remembered display name for friend challenges.
   const [challengerName, setChallengerName] = useState<string>("");
+  // Daily streak (consecutive days) with freeze protection.
+  const [dailyStreak, setDailyStreak] = useState<DailyStreak>(() => emptyDailyStreak());
 
   // Load saved stats + daily-done marker + remembered name once on mount.
   useEffect(() => {
@@ -96,6 +107,9 @@ export default function App() {
     });
     storage.getItem(NAME_KEY).then((n) => {
       if (alive && n) setChallengerName(n);
+    });
+    loadDailyStreak(storage).then((s) => {
+      if (alive) setDailyStreak(s);
     });
     return () => {
       alive = false;
@@ -152,9 +166,14 @@ export default function App() {
   const finishGame = (finalState: GameState) => {
     if (!config) return;
     const today = localDayKey();
+    let streakForSummary: SummaryData["dailyStreak"];
     if (config.mode === "daily") {
       saveDailyDone(storage, today).catch(() => {});
       setDailyDoneKey(today);
+      const { state: nextStreak, event } = recordDailyPlay(dailyStreak, today);
+      setDailyStreak(nextStreak);
+      saveDailyStreak(storage, nextStreak).catch(() => {});
+      streakForSummary = { current: nextStreak.current, freezes: nextStreak.freezes, event };
     }
     setSummary({
       variant: config.variant,
@@ -163,6 +182,7 @@ export default function App() {
       finalState,
       dayKey: today,
       challenge: config.challenge,
+      dailyStreak: streakForSummary,
     });
     setScreen("summary");
   };
@@ -189,6 +209,7 @@ export default function App() {
             onStats={() => setScreen("stats")}
             onInstructions={() => setScreen("instructions")}
             dailyDone={isDailyDone(dailyDoneKey, localDayKey())}
+            streak={dailyStreakStatus(dailyStreak, localDayKey())}
           />
         )}
         {screen === "setup" && <SetupScreen onStart={startPractice} onBack={() => setScreen("home")} />}
@@ -220,6 +241,7 @@ export default function App() {
             finalState={summary.finalState}
             dayKey={summary.dayKey}
             challenge={summary.challenge}
+            dailyStreak={summary.dailyStreak}
             onPlayAgain={playAgain}
             onHome={() => setScreen("home")}
           />
