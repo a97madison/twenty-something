@@ -24,6 +24,7 @@ import {
 } from "./percentile.ts";
 import type { DailyPuzzleDoc, UserDoc, RoomDoc, RoomRoundDoc } from "./model.ts";
 import { dealSolvableRound, makeRoomCode, sanitizeWinningScore, sanitizeDuration } from "./rooms.ts";
+import { buildExpoPushMessage, challengeResultPush, isExpoPushToken, type ChallengeResult } from "./push.ts";
 
 initializeApp();
 const db = getFirestore();
@@ -352,4 +353,59 @@ export const dealRoomRound = onCall<DealRoundInput>(async (request) => {
     operations: round.operations,
     endsAt: endsAt ? endsAt.toMillis() : null,
   };
+});
+
+// --------------------------------------------------------------------------
+// Social push — the only nudge that needs a server (no device knows when your
+// friend accepts your offline challenge). Register a token keyed by the stable
+// playerId the challenge code carries; the accepter reports the result; we push.
+// --------------------------------------------------------------------------
+
+const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+
+interface RegisterTokenInput {
+  playerId?: unknown;
+  token?: unknown;
+}
+
+export const registerPushToken = onCall<RegisterTokenInput>(async (request) => {
+  const uid = requireUid(request.auth);
+  const { playerId, token } = request.data;
+  if (typeof playerId !== "string" || !playerId || !isExpoPushToken(token)) {
+    throw new HttpsError("invalid-argument", "Bad token registration.");
+  }
+  // Keyed by playerId (what the challenge code carries); uid stored for audit.
+  await db.doc(`pushTokens/${playerId}`).set({ token, uid, updatedAt: Timestamp.now() }, { merge: true });
+  return { ok: true };
+});
+
+interface ReportResultInput {
+  challengerPlayerId?: unknown;
+  result?: unknown;
+  accepterName?: unknown;
+}
+
+const RESULTS = new Set<ChallengeResult>(["win", "loss", "tie"]);
+
+export const reportChallengeResult = onCall<ReportResultInput>(async (request) => {
+  requireUid(request.auth);
+  const { challengerPlayerId, result, accepterName } = request.data;
+  if (typeof challengerPlayerId !== "string" || !RESULTS.has(result as ChallengeResult)) {
+    throw new HttpsError("invalid-argument", "Bad result report.");
+  }
+  const snap = await db.doc(`pushTokens/${challengerPlayerId}`).get();
+  if (!snap.exists) return { sent: false }; // challenger never registered for push
+  const token = (snap.data() as { token: string }).token;
+  const { title, body } = challengeResultPush(typeof accepterName === "string" ? accepterName : "", result as ChallengeResult);
+  const message = buildExpoPushMessage(token, title, body, { kind: "challenge_result" });
+  try {
+    await fetch(EXPO_PUSH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(message),
+    });
+  } catch {
+    return { sent: false };
+  }
+  return { sent: true };
 });

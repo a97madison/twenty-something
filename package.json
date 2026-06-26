@@ -14,6 +14,7 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test:emulator": "npm run build:deploy -w @twenty-something/functions && firebase emulators:exec --only auth,firestore,functions --project demo-ts \"node functions/integration/percentile.test.mjs\"",
-    "test:emulator:rooms": "npm run build:deploy -w @twenty-something/functions && firebase emulators:exec --only auth,firestore,functions --project demo-ts \"node functions/integration/rooms.test.mjs\""
+    "test:emulator:rooms": "npm run build:deploy -w @twenty-something/functions && firebase emulators:exec --only auth,firestore,functions --project demo-ts \"node functions/integration/rooms.test.mjs\"",
+    "test:emulator:push": "npm run build:deploy -w @twenty-something/functions && firebase emulators:exec --only auth,firestore,functions --project demo-ts \"node functions/integration/push.test.mjs\""
   }
 }
