@@ -46,6 +46,8 @@ import {
 import { storage } from "./storage";
 import { track, setAnalyticsSink, Events } from "./analytics";
 import { createPostHogSink } from "./backend/analytics";
+import { reportChallengeResult } from "./backend/push";
+import { registerForPush } from "./registerPush";
 import { localDayKey } from "./screens/format";
 import { HomeScreen } from "./screens/HomeScreen";
 import { SetupScreen } from "./screens/SetupScreen";
@@ -318,6 +320,8 @@ export default function App() {
       const r = nextRivals[key]!;
       rivalForSummary = { name: r.name, wins: r.wins, losses: r.losses, ties: r.ties };
       track(Events.ChallengeResult, { result, hands: ch.hands });
+      // Ping the challenger's device how it went (no-ops unless they opted into push).
+      reportChallengeResult(storage, ch.challenger.playerId ?? "", result, challengerName).catch(() => {});
     }
 
     const sess = finalState.session;
@@ -339,6 +343,9 @@ export default function App() {
       dailyStreak: streakForSummary,
       rival: rivalForSummary,
     });
+    // Value moment: now that they've finished a game, ask for push permission
+    // (self-dedupes, and no-ops until a dev build can mint a token).
+    registerForPush(playerId);
     setScreen("summary");
   };
 
