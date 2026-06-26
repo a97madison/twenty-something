@@ -30,11 +30,11 @@ export interface RoomRound {
 }
 
 export interface RoomState {
-  status: "lobby" | "in_progress" | "finished";
+  status: "lobby" | "ready_up" | "in_progress" | "finished";
   variant: Variant;
   hostId: string;
   winningScore: number | null;
-  players: { uid: string; score: number }[];
+  players: { uid: string; score: number; ready: boolean }[];
   round: RoomRound | null;
 }
 
@@ -43,6 +43,12 @@ export const createRoom = (store: KeyValueStore, variant: Variant, winningScore:
 
 export const joinRoom = (store: KeyValueStore, roomId: string) =>
   callFn(store, "joinRoom", { roomId }) as Promise<{ roomId: string; variant: Variant; winningScore: number; status: string }>;
+
+export const startMatch = (store: KeyValueStore, roomId: string) =>
+  callFn(store, "startMatch", { roomId }) as Promise<{ ok: boolean }>;
+
+export const readyUp = (store: KeyValueStore, roomId: string) =>
+  callFn(store, "readyUp", { roomId }) as Promise<{ ok: boolean }>;
 
 export const dealRoomRound = (store: KeyValueStore, roomId: string, roundNumber: number, durationSec?: number) =>
   callFn(store, "dealRoomRound", { roomId, roundNumber, durationSec }) as Promise<RoomRound>;

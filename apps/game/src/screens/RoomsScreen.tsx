@@ -20,7 +20,7 @@ import {
 
 import { storage } from "../storage";
 import { getUid } from "../backend/auth";
-import { createRoom, joinRoom, dealRoomRound, getRoomState, submitRoomSolution, type RoomState } from "../backend/rooms";
+import { createRoom, joinRoom, startMatch, readyUp, dealRoomRound, getRoomState, submitRoomSolution, type RoomState } from "../backend/rooms";
 import { variantLabel, tokenStr } from "./format";
 
 const SUITS: SuitData[] = [
@@ -34,7 +34,7 @@ const POLL_MS = 1500;
 /** Rounds to win the match. */
 const WINNING_SCORE = 3;
 
-type Phase = "entry" | "lobby" | "race" | "done";
+type Phase = "entry" | "lobby" | "ready" | "race" | "done";
 
 function expectsOperand(tokens: CheckerToken[]): boolean {
   const last = tokens[tokens.length - 1];
@@ -60,7 +60,10 @@ interface Props {
  */
 export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
   const [phase, setPhase] = useState<Phase>("entry");
+  // Within the entry phase: a hub → create-setup / join-by-code.
+  const [entryView, setEntryView] = useState<"hub" | "create" | "join">("hub");
   const [variant, setVariant] = useState<Variant>(initialVariant);
+  const [winningScore, setWinningScore] = useState(WINNING_SCORE);
   const [roomId, setRoomId] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [uid, setUid] = useState("");
@@ -75,9 +78,9 @@ export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
     getUid(storage).then(setUid).catch(() => {});
   }, []);
 
-  // Poll live room state while in the lobby or a race.
+  // Poll live room state while in the lobby, ready-up, or a race.
   useEffect(() => {
-    if ((phase !== "lobby" && phase !== "race") || !roomId) return;
+    if (!["lobby", "ready", "race"].includes(phase) || !roomId) return;
     let alive = true;
     const tick = async () => {
       try {
@@ -93,6 +96,8 @@ export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
             setTokens([]);
             setFeedback(null);
           }
+        } else if (s.status === "ready_up") {
+          setPhase("ready");
         }
       } catch {
         /* transient — next tick retries */
@@ -110,7 +115,7 @@ export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const r = await createRoom(storage, variant, WINNING_SCORE);
+      const r = await createRoom(storage, variant, winningScore);
       setRoomId(r.roomId);
       setPhase("lobby");
     } catch {
@@ -142,6 +147,39 @@ export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
   };
 
   const isHost = state?.hostId === uid && uid !== "";
+
+  // N-player derived state (no per-player labels — counts + your/top score).
+  const players = state?.players ?? [];
+  const playerCount = players.length;
+  const myReady = players.find((p) => p.uid === uid)?.ready ?? false;
+  const readyCount = players.filter((p) => p.ready).length;
+  const allReady = playerCount > 0 && readyCount === playerCount;
+  const myScore = players.find((p) => p.uid === uid)?.score ?? 0;
+  const topScore = players.reduce((m, p) => Math.max(m, p.score), 0);
+
+  const doStart = async () => {
+    try {
+      await startMatch(storage, roomId);
+    } catch {
+      setError("Couldn't start the match.");
+    }
+  };
+  const doReady = () => {
+    readyUp(storage, roomId).catch(() => {});
+  };
+
+  // Host deals the first round automatically once everyone has readied up.
+  const dealt = useRef(false);
+  useEffect(() => {
+    if (phase !== "ready") {
+      dealt.current = false;
+      return;
+    }
+    if (isHost && allReady && !dealt.current) {
+      dealt.current = true;
+      dealRound(1);
+    }
+  }, [phase, isHost, allReady]);
 
   const dealRound = async (roundNumber: number) => {
     try {
@@ -187,7 +225,14 @@ export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
   };
 
   // ---- Render -------------------------------------------------------------
-  const back = () => (phase === "entry" ? onBack() : (setPhase("entry"), setState(null), setRoomId(""), setError(null)));
+  const back = () => {
+    setError(null);
+    if (phase === "entry") return entryView === "hub" ? onBack() : setEntryView("hub");
+    setPhase("entry");
+    setEntryView("hub");
+    setState(null);
+    setRoomId("");
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -198,39 +243,72 @@ export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
       {phase === "entry" && (
         <ScrollView contentContainerStyle={styles.entry}>
           <Text style={styles.title}>Live rooms</Text>
-          <Text style={styles.blurb}>Race a friend on the same hand — first to solve wins the round, first to {WINNING_SCORE} wins.</Text>
 
-          <Text style={styles.label}>VARIANT</Text>
-          <View style={styles.choiceRow}>
-            {(["24", "20_something"] as Variant[]).map((v) => (
-              <Tappable key={v} style={[styles.choice, variant === v && styles.choiceOn]} onPress={() => setVariant(v)}>
-                <Text style={[styles.choiceText, variant === v && styles.choiceTextOn]}>{variantLabel(v)}</Text>
+          {entryView === "hub" && (
+            <>
+              <Text style={styles.blurb}>Compete against your friends!</Text>
+              <Tappable style={[styles.btn, styles.primary]} onPress={() => setEntryView("create")}>
+                <Text style={styles.primaryText}>Create a room</Text>
               </Tappable>
-            ))}
-          </View>
+              <Tappable style={[styles.btn, styles.secondary]} onPress={() => setEntryView("join")}>
+                <Text style={styles.secondaryText}>Join with a code</Text>
+              </Tappable>
+            </>
+          )}
 
-          <Tappable style={[styles.btn, styles.primary]} onPress={doCreate} disabled={busy}>
-            <Text style={styles.primaryText}>{busy ? "Creating…" : "Create a room"}</Text>
-          </Tappable>
+          {entryView === "create" && (
+            <>
+              <Text style={styles.label}>VARIANT</Text>
+              <View style={styles.choiceRow}>
+                {(["24", "20_something"] as Variant[]).map((v) => (
+                  <Tappable key={v} style={[styles.choice, variant === v && styles.choiceOn]} onPress={() => setVariant(v)}>
+                    <Text style={[styles.choiceText, variant === v && styles.choiceTextOn]}>{variantLabel(v)}</Text>
+                  </Tappable>
+                ))}
+              </View>
 
-          <Text style={styles.or}>or join with a code</Text>
-          <TextInput
-            style={styles.codeInput}
-            value={joinCode}
-            onChangeText={(t) => {
-              setJoinCode(t.toUpperCase());
-              if (error) setError(null);
-            }}
-            placeholder="ABCD"
-            placeholderTextColor={colors.inkFaint}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={6}
-          />
-          <Tappable style={[styles.btn, styles.secondary]} onPress={doJoin} disabled={busy}>
-            <Text style={styles.secondaryText}>Join room</Text>
-          </Tappable>
-          {error && <Text style={styles.error}>{error}</Text>}
+              <Text style={styles.label}>FIRST TO</Text>
+              <View style={styles.choiceRow}>
+                {[3, 5, 7].map((n) => (
+                  <Tappable key={n} style={[styles.choice, winningScore === n && styles.choiceOn]} onPress={() => setWinningScore(n)}>
+                    <Text style={[styles.choiceText, winningScore === n && styles.choiceTextOn]}>{n}</Text>
+                  </Tappable>
+                ))}
+              </View>
+
+              <Text style={styles.hint}>You'll get a room code to share. First to win {winningScore} rounds takes the match.</Text>
+              <Tappable style={[styles.btn, styles.primary, styles.cta]} onPress={doCreate} disabled={busy}>
+                <Text style={styles.primaryText}>{busy ? "Creating…" : "Create room"}</Text>
+              </Tappable>
+              {error && <Text style={styles.error}>{error}</Text>}
+            </>
+          )}
+
+          {entryView === "join" && (
+            <>
+              <Text style={styles.label}>ROOM CODE</Text>
+              <TextInput
+                style={styles.codeInput}
+                value={joinCode}
+                onChangeText={(t) => {
+                  setJoinCode(t.toUpperCase());
+                  if (error) setError(null);
+                }}
+                placeholder="ABCD"
+                placeholderTextColor={colors.inkFaint}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={6}
+                returnKeyType="go"
+                onSubmitEditing={doJoin}
+              />
+              <Text style={styles.hint}>Enter the code a friend shared to join their room.</Text>
+              <Tappable style={[styles.btn, styles.primary, styles.cta]} onPress={doJoin} disabled={busy}>
+                <Text style={styles.primaryText}>{busy ? "Joining…" : "Join room"}</Text>
+              </Tappable>
+              {error && <Text style={styles.error}>{error}</Text>}
+            </>
+          )}
         </ScrollView>
       )}
 
@@ -238,17 +316,13 @@ export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
         <View style={styles.lobby}>
           <Text style={styles.kicker}>ROOM CODE</Text>
           <Text style={styles.roomCode}>{roomId}</Text>
-          <Text style={styles.blurb}>Share this code. {variantLabel(variant)} · first to {WINNING_SCORE}.</Text>
+          <Text style={styles.blurb}>Share this code. {variantLabel(variant)} · first to {state?.winningScore ?? winningScore}.</Text>
 
-          <Text style={styles.label}>PLAYERS ({state?.players.length ?? 1})</Text>
-          {(state?.players ?? []).map((p) => (
-            <Text key={p.uid} style={styles.playerRow}>
-              {p.uid === uid ? "You" : "Opponent"} {p.uid === state?.hostId ? "· host" : ""}
-            </Text>
-          ))}
+          <Text style={styles.playerCount}>{playerCount}</Text>
+          <Text style={styles.label}>{playerCount === 1 ? "PLAYER — SHARE THE CODE" : "PLAYERS"}</Text>
 
           {isHost ? (
-            <Tappable style={[styles.btn, styles.primary, styles.lobbyBtn]} onPress={() => dealRound(1)}>
+            <Tappable style={[styles.btn, styles.primary, styles.lobbyBtn]} onPress={doStart}>
               <Text style={styles.primaryText}>Start the match</Text>
             </Tappable>
           ) : (
@@ -261,30 +335,45 @@ export function RoomsScreen({ variant: initialVariant, onBack }: Props) {
         </View>
       )}
 
+      {phase === "ready" && (
+        <View style={styles.lobby}>
+          <Text style={styles.title}>Ready up</Text>
+          <Text style={styles.readyCount}>{readyCount} / {playerCount}</Text>
+          <Text style={styles.blurb}>The match starts once everyone's ready.</Text>
+          {myReady ? (
+            <View style={styles.waiting}>
+              <ActivityIndicator color={colors.accent} />
+              <Text style={styles.waitingText}>Waiting for everyone…</Text>
+            </View>
+          ) : (
+            <Tappable style={[styles.btn, styles.primary, styles.lobbyBtn]} onPress={doReady}>
+              <Text style={styles.primaryText}>I'm ready</Text>
+            </Tappable>
+          )}
+          {error && <Text style={styles.error}>{error}</Text>}
+        </View>
+      )}
+
       {(phase === "race" || phase === "done") && (
         <View style={styles.race}>
           <View style={styles.scoreboard}>
-            {(state?.players ?? []).map((p) => (
-              <View key={p.uid} style={[styles.scoreCell, p.uid === uid && styles.scoreMine]}>
-                <Text style={styles.scoreName}>{p.uid === uid ? "You" : "Opp"}</Text>
-                <Text style={styles.scoreNum}>{p.score}</Text>
-              </View>
-            ))}
+            <View style={[styles.scoreCell, styles.scoreMine]}>
+              <Text style={styles.scoreName}>YOU</Text>
+              <Text style={styles.scoreNum}>{myScore}</Text>
+            </View>
             <View style={styles.scoreCell}>
-              <Text style={styles.scoreName}>TO WIN</Text>
+              <Text style={styles.scoreName}>TOP</Text>
+              <Text style={styles.scoreNum}>{topScore}</Text>
+            </View>
+            <View style={styles.scoreCell}>
+              <Text style={styles.scoreName}>FIRST TO</Text>
               <Text style={styles.scoreNum}>{state?.winningScore ?? WINNING_SCORE}</Text>
             </View>
           </View>
 
           {phase === "done" ? (
             <View style={styles.done}>
-              <Text style={styles.doneTitle}>
-                {(() => {
-                  const me = state?.players.find((p) => p.uid === uid)?.score ?? 0;
-                  const top = Math.max(0, ...(state?.players ?? []).map((p) => p.score));
-                  return me >= top && me > 0 ? "🏆 You win!" : "Match over";
-                })()}
-              </Text>
+              <Text style={styles.doneTitle}>{myScore >= topScore && myScore > 0 ? "🏆 You win!" : "Match over"}</Text>
               <Tappable style={[styles.btn, styles.primary]} onPress={onBack}>
                 <Text style={styles.primaryText}>Back to home</Text>
               </Tappable>
@@ -364,12 +453,15 @@ const styles = StyleSheet.create({
   secondary: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2, ...shadows.soft },
   secondaryText: { fontFamily: fonts.serifSemibold, fontSize: 16, color: colors.ink },
   or: { fontFamily: fonts.sans, fontSize: 13, color: colors.inkFaint, textAlign: "center", marginTop: 22 },
+  hint: { fontFamily: fonts.sans, fontSize: 13, color: colors.inkFaint, marginTop: 16, lineHeight: 18 },
+  cta: { marginTop: 20 },
   codeInput: { fontFamily: fonts.monoMedium, fontSize: 24, letterSpacing: 6, textAlign: "center", color: colors.ink, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2, borderRadius: radius.md, paddingVertical: 14, marginTop: 10 },
   error: { fontFamily: fonts.sans, fontSize: 13, color: colors.bad, marginTop: 12, textAlign: "center" },
   lobby: { flex: 1, alignItems: "center", paddingTop: 24 },
   kicker: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.6, color: colors.inkFaint },
   roomCode: { fontFamily: fonts.serifBold, fontSize: 56, letterSpacing: 8, color: colors.accent, marginVertical: 6 },
-  playerRow: { fontFamily: fonts.serifSemibold, fontSize: 16, color: colors.ink, marginTop: 4 },
+  playerCount: { fontFamily: fonts.serifBold, fontSize: 52, color: colors.ink, marginTop: 18 },
+  readyCount: { fontFamily: fonts.serifBold, fontSize: 52, color: colors.accent, marginTop: 18 },
   lobbyBtn: { alignSelf: "stretch", marginHorizontal: 12, marginTop: 30 },
   waiting: { alignItems: "center", gap: 10, marginTop: 30 },
   waitingText: { fontFamily: fonts.sans, fontSize: 14, color: colors.inkDim },
