@@ -192,12 +192,20 @@ Still open in stage 4 (not yet built): **crash reporting**, store legal/assets.
   first-valid-solve-wins. Pure pieces tested; **emulator e2e 6/6** incl. the
   first-solver-wins race + host-only deal + getRoomState. NOT deployed yet, and
   the 3 room callables need a public `run.invoker` like submitDailyGameResult.
-  **Remaining: the client** — lobby/race/results screens + a getRoomState polling
-  loop wired to CalcPad. A multi-screen real-time feature; its own next chunk.
+  **Client BUILT** (`screens/RoomsScreen.tsx`, Home → "Live rooms"): create/join
+  by code → lobby → race (CalcPad wired to submitRoomSolution, live scoreboard) →
+  match over, syncing by polling getRoomState every 1.5s. backend/rooms.ts is the
+  auth'd REST client. Typecheck + bundle + web smoke (entry renders, graceful
+  offline) — but the LIVE race is unverifiable until the 3 callables are deployed
+  with a public run.invoker. Rooms cards are always solvable so CalcPad's
+  No-solution/Pass keys are inert here (a pad variant can hide them later).
 - **Social push — BACKEND DONE, client token gated on the dev build.**
   `registerPushToken` (keyed by the playerId the challenge code carries) +
   `reportChallengeResult` → Expo push from the challenger's POV ("😤 Sam beat your
   challenge — rematch?"). Pure copy/payload tested; **emulator e2e 4/4**. The
-  CLIENT can't mint an Expo push token without expo-notifications + an EAS dev
-  build; `reportChallengeResult` can be called from the accept flow today (no-ops
-  until the challenger registers). Not deployed yet.
+  CLIENT can't mint an Expo push token without an EAS dev build (Expo Go can't).
+  **Client WIRED** anyway (`registerPush.ts` + `backend/push.ts`; expo-notifications
+  added, both apps still bundle; app.json plugin set): registerForPush() asks at a
+  value moment and no-ops until a build can mint a token, and the accept flow
+  fire-and-forget calls reportChallengeResult. Unverifiable until a dev build —
+  by design (no runtime here can produce a token). Not deployed yet.
