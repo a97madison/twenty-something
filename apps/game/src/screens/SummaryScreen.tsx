@@ -17,6 +17,7 @@ import {
   type GameState,
 } from "../logic";
 import { storage } from "../storage";
+import { track, Events } from "../analytics";
 import { BACKEND_ENABLED } from "../backend/config";
 import { submitDailyResult, type DailyPercentile } from "../backend/daily";
 import { RatingStars } from "./RatingStars";
@@ -117,6 +118,7 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
       totalTimeSec: s.timeSumCorrect > 0 ? Math.round(s.timeSumCorrect / 1000) : undefined,
       currentStreak: dailyStreak?.current ?? 0,
     });
+    track(Events.ShareResult, { solved: s.correct, total: s.total });
     Share.share({ message }).catch(() => {});
   };
 
@@ -166,6 +168,7 @@ export function SummaryScreen({ variant, mode, previousStats, finalState, dayKey
       `Tap to play the exact same hands:`,
       challengeUrl(code),
     ].join("\n");
+    track(Events.ShareChallenge, { variant, hands: challenge!.hands });
     Share.share({ message }).catch(() => {});
   };
 

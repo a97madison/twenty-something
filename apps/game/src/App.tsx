@@ -44,6 +44,7 @@ import {
   type Rivals,
 } from "./logic";
 import { storage } from "./storage";
+import { track, setAnalyticsSink, Events } from "./analytics";
 import { localDayKey } from "./screens/format";
 import { HomeScreen } from "./screens/HomeScreen";
 import { SetupScreen } from "./screens/SetupScreen";
@@ -128,6 +129,12 @@ export default function App() {
   // Load saved stats + daily-done marker + remembered name once on mount.
   useEffect(() => {
     let alive = true;
+    // Dev: log events to the console; prod stays a no-op until a real sink (an
+    // analytics SDK) is installed here at the dev-build step.
+    if (typeof __DEV__ !== "undefined" && __DEV__) {
+      setAnalyticsSink((e, p) => console.log("📊", e, p));
+    }
+    track(Events.AppOpen);
     loadStats(storage).then((s) => {
       if (alive) setStats(s);
     });
@@ -168,12 +175,14 @@ export default function App() {
   };
 
   const changePrefs = (p: Prefs) => {
+    track(Events.SettingsChanged);
     setPrefs(p);
     savePrefs(storage, p).catch(() => {});
   };
 
   // Erase every on-device record and reset in-memory state to a fresh install.
   const deleteAllData = () => {
+    track(Events.DataDeleted);
     storage.clear().catch(() => {});
     setStats(emptyStats());
     setDailyStreak(emptyDailyStreak());
@@ -188,6 +197,7 @@ export default function App() {
   };
 
   const launch = (cfg: GameConfig) => {
+    track(Events.GameStart, { mode: cfg.mode, variant: cfg.variant, hands: cfg.count });
     setConfig(cfg);
     setStartStats(stats);
     setGameNonce((n) => n + 1);
@@ -206,6 +216,7 @@ export default function App() {
 
   // Create a fresh challenge: deal from a new random seed, remember the name, play.
   const startChallengeCreate = (variant: Variant, hands: number, name: string) => {
+    track(Events.ChallengeCreated, { variant, hands });
     const seed = randomSeed();
     setChallengerName(name);
     storage.setItem(NAME_KEY, name).catch(() => {});
@@ -220,6 +231,7 @@ export default function App() {
 
   // Accept a pasted challenge: re-deal its exact hands, play head-to-head.
   const startChallengeAccept = (c: Challenge) => {
+    track(Events.ChallengeAccepted, { variant: c.variant, hands: c.hands });
     launch({
       variant: c.variant,
       hands: dealSeededHands(c.seed, c.variant, c.hands),
@@ -250,6 +262,7 @@ export default function App() {
       const incoming = challengeFromUrl(webUrl) ?? challengeFromUrl(nativeUrl);
       if (cancelled) return;
       if (incoming) {
+        track(Events.DeepLinkOpen, { variant: incoming.variant });
         // Clean the web address bar so a refresh doesn't replay the challenge.
         if (typeof window !== "undefined" && window.history?.replaceState) {
           window.history.replaceState({}, "", window.location.pathname);
@@ -300,7 +313,17 @@ export default function App() {
       saveRivals(storage, nextRivals).catch(() => {});
       const r = nextRivals[key]!;
       rivalForSummary = { name: r.name, wins: r.wins, losses: r.losses, ties: r.ties };
+      track(Events.ChallengeResult, { result, hands: ch.hands });
     }
+
+    const sess = finalState.session;
+    track(Events.GameComplete, {
+      mode: config.mode,
+      variant: config.variant,
+      solved: sess.correct,
+      total: sess.total,
+      rating: sess.total === 0 ? 0 : Math.round((sess.starSum / sess.total) * 100) / 100,
+    });
 
     setSummary({
       variant: config.variant,
