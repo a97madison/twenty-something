@@ -178,7 +178,26 @@ The "well-rounded app" layer around the game, all pure-client / no new deps:
   shares, settings, delete). The real SDK plugs into `setAnalyticsSink` at the
   dev-build step — no graph change needed now.
 
-Still open in stage 4 (not yet built): **crash reporting**, the analytics **sink**
-(pick PostHog/Firebase/REST at the dev build), store legal/assets, and the
-**social-push architecture** (challenge-accepted / rival-passed-you notifications
-need server push, not local scheduling).
+Still open in stage 4 (not yet built): **crash reporting**, store legal/assets.
+
+## 8. Analytics sink, live rooms, social push — BUILT this pass
+
+- **Analytics sink — DONE.** Zero-dep PostHog REST capture (`backend/analytics.ts`,
+  micro-batch → /batch/), installed with the device id as distinct_id. Flip
+  `ANALYTICS_ENABLED` + paste a PostHog key in `backend/config.ts` to light it up.
+- **Live rooms — BACKEND DONE, client UI is the remaining piece.** New callables
+  `createRoom` / `joinRoom` / `dealRoomRound` (host-only, server-side
+  GUARANTEED-solvable deal via core's solver) / `getRoomState` (poll for live
+  state — clients can't read default-deny room docs). `submitRoomSolution` scores
+  first-valid-solve-wins. Pure pieces tested; **emulator e2e 6/6** incl. the
+  first-solver-wins race + host-only deal + getRoomState. NOT deployed yet, and
+  the 3 room callables need a public `run.invoker` like submitDailyGameResult.
+  **Remaining: the client** — lobby/race/results screens + a getRoomState polling
+  loop wired to CalcPad. A multi-screen real-time feature; its own next chunk.
+- **Social push — BACKEND DONE, client token gated on the dev build.**
+  `registerPushToken` (keyed by the playerId the challenge code carries) +
+  `reportChallengeResult` → Expo push from the challenger's POV ("😤 Sam beat your
+  challenge — rematch?"). Pure copy/payload tested; **emulator e2e 4/4**. The
+  CLIENT can't mint an Expo push token without expo-notifications + an EAS dev
+  build; `reportChallengeResult` can be called from the accept flow today (no-ops
+  until the challenger registers). Not deployed yet.
