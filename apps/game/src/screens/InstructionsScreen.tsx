@@ -23,7 +23,6 @@ export function InstructionsScreen({ onBack }: Props) {
         <View style={styles.example}>
           <Text style={styles.exampleLabel}>EXAMPLE</Text>
           <Text style={styles.exampleCards}>7   3   8   2</Text>
-          <Text style={styles.exampleTarget}>make 24</Text>
         </View>
 
         <Section title="The two variants">
@@ -33,6 +32,19 @@ export function InstructionsScreen({ onBack }: Props) {
           <Para>
             <Em>20-Something</Em> — the target is 18 plus the value of the last card (the one marked{" "}
             <Em>TARGET CARD</Em>). A Jack there means 18 + 11 = 29.
+          </Para>
+        </Section>
+
+        <Section title="24 solution">
+          <Para>
+            With the cards above, make 24: <Em>(8 - 2) × (7 - 3) = 24</Em>.
+          </Para>
+        </Section>
+
+        <Section title="20-Something solution">
+          <Para>
+            Same cards. The TARGET CARD is <Em>2</Em>, so the target is 18 + 2 = 20:{" "}
+            <Em>8 × 2 + 7 - 3 = 20</Em>.
           </Para>
         </Section>
 
@@ -98,5 +110,4 @@ const styles = StyleSheet.create({
   },
   exampleLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.4, color: colors.inkFaint },
   exampleCards: { fontFamily: fonts.serifBold, fontSize: 28, letterSpacing: 4, color: colors.ink },
-  exampleTarget: { fontFamily: fonts.mono, fontSize: 15, color: colors.accent },
 });

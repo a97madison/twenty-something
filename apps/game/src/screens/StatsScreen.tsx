@@ -12,6 +12,11 @@ const ALLTIME_GATE = 10;
 /** Hands this week before the weekly rating unlocks. */
 const WEEKLY_GATE = 5;
 
+/** "10 hands" / "1 hand" — pluralized count for the rating-gate copy. */
+function handsLabel(n: number): string {
+  return `${n} hand${n === 1 ? "" : "s"}`;
+}
+
 interface Props {
   stats: AllStats;
   rivals: Rivals;
@@ -87,14 +92,14 @@ function VariantCard({ variant, stats, dayKey, weekCloses }: { variant: Variant;
         label="ALL-TIME"
         rollup={allTime}
         ratingGated={allTime.count < ALLTIME_GATE}
-        gateMsg={`Play ${ALLTIME_GATE - allTime.count} more to see your rating`}
+        gateMsg={`Play ${handsLabel(ALLTIME_GATE - allTime.count)} to see your rating`}
       />
       <View style={styles.hr} />
       <Window
         label={`THIS WEEK (${weekCloses})`}
         rollup={weekly}
         ratingGated={weekly.count < WEEKLY_GATE}
-        gateMsg="Not enough hands this week yet"
+        gateMsg={`Play ${handsLabel(WEEKLY_GATE - weekly.count)} this week to see your rating`}
       />
 
       <View style={styles.hr} />
