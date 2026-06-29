@@ -145,7 +145,7 @@ export function dealDailyHands(
 /** Solve at or under this (ms) earns the full speed bonus. */
 export const FAST_MS = 5_000;
 /** Solve at or over this (ms) earns no speed bonus (still correct). */
-export const SLOW_MS = 60_000;
+export const SLOW_MS = 90_000;
 /** A correct hand is worth at least this many stars (the "you got it right" half). */
 export const CORRECT_BASE_STARS = 2.5;
 /** Maximum stars for a single hand. */
@@ -443,16 +443,17 @@ function commit(
   };
 }
 
-/** The result of submitting an expression. On a wrong answer, `state` is unchanged. */
+/** The result of submitting an expression. Both branches commit and advance. */
 export type SubmitOutcome =
   | { solved: true; elapsedMs: number; stars: number; state: GameState }
-  | { solved: false; error: ValidationError; state: GameState };
+  | { solved: false; error: ValidationError; reveal: Reveal | null; state: GameState };
 
 /**
  * Submit an expression as a solution to the current hand. Judged by core's
- * validateSolution. A CORRECT answer is a committed decision: scored by speed,
- * streak +1, stats updated, hand advances. A WRONG answer is NOT committed —
- * nothing changes, the clock keeps running, the player tries again.
+ * validateSolution. Either way it is a committed decision and the hand advances:
+ * a CORRECT answer is scored by speed (streak +1), a WRONG answer counts incorrect
+ * (star 0, streak reset) and reveals a worked solution. The clock does not give a
+ * second try — a completed expression is a final answer.
  */
 export function submitSolution(
   state: GameState,
@@ -461,16 +462,18 @@ export function submitSolution(
   dayKey: string,
 ): SubmitOutcome {
   const hand = currentHand(state);
-  if (!hand) return { solved: false, error: "wrong_cards", state };
+  if (!hand) return { solved: false, error: "wrong_cards", reveal: null, state };
   const result = validateSolution(expr, {
     hand: hand.hand,
     target: hand.target,
     operations: CLASSIC_OPERATIONS,
   });
-  if (!result.valid) {
-    return { solved: false, error: result.error, state };
-  }
   const elapsedMs = Math.max(0, now - state.handStartedAt);
+  if (!result.valid) {
+    const reveal = revealFor(hand);
+    const next = commit(state, dayKey, now, { correct: false, elapsedMs, star: 0 }, reveal);
+    return { solved: false, error: result.error, reveal, state: next };
+  }
   const stars = starScore(elapsedMs);
   const next = commit(state, dayKey, now, { correct: true, elapsedMs, star: stars }, null);
   return { solved: true, elapsedMs, stars, state: next };

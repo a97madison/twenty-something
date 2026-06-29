@@ -94,19 +94,26 @@ test("a correct solution scores by speed, bumps streak, records stats, advances"
   assert.equal(out.state.stats["24"].bestTimeMs, 8000);
 });
 
-test("a wrong solution changes nothing — wrong costs time, not the streak", () => {
+test("a wrong solution commits incorrect: reveal a solution, break streak, advance", () => {
   const start = newGame("24", [SOLVABLE(), SOLVABLE()], { now: 0 });
   const first = submitSolution(start, solveExpr(SOLVABLE()), 5000, DAY);
   assert.ok(first.solved);
   if (!first.solved) return;
   const g = first.state;
+  assert.equal(g.streak, 1);
 
   const out = submitSolution(g, WRONG_EXPR, 9000, DAY);
   assert.equal(out.solved, false);
   if (out.solved) return;
   assert.equal(out.error, "wrong_value");
-  assert.equal(out.state, g); // identical reference — untouched
-  assert.equal(out.state.streak, 1);
+  assert.ok(out.reveal && typeof out.reveal.solution === "string", "should reveal a worked solution");
+  assert.equal(out.state.streak, 0); // streak broken
+  assert.equal(out.state.index, 2); // advanced past the wrong hand
+  assert.equal(out.state.session.total, 2);
+  assert.equal(out.state.session.correct, 1);
+  const roll = allTimeRollup(out.state.stats["24"]);
+  assert.equal(roll.count, 2);
+  assert.equal(roll.correctCount, 1);
 });
 
 test("claim 'no solution' on an unsolvable hand is correct (streak +1, no reveal)", () => {

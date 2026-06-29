@@ -33,6 +33,9 @@ interface Props {
   variant: Variant;
   /** The number to make — shown as the green pill in the expression row. */
   target: number;
+  /** A wrong submitted answer's evaluated value: flashes the pill red and shows
+   *  this (rounded to 1dp) in place of the target. null/non-finite → green target. */
+  wrongResult?: number | null;
   /** The live expression "display" string. Empty → placeholder. */
   expression: string;
   /** Card indices already placed in the expression (dimmed + un-tappable). */
@@ -68,6 +71,12 @@ function pip(v: number): string {
   return String(v);
 }
 
+/** A wrong answer's value for the pill: rounded to 1 decimal, trailing ".0" dropped. */
+function formatPillResult(v: number): string {
+  const r = Math.round(v * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
+}
+
 /**
  * The calculator-style input pad: an expression "display" with the target as a
  * green pill, a 2×2 card grid that flips to reveal on each deal, a vertical
@@ -83,6 +92,7 @@ export function CalcPad({
   suitData,
   variant,
   target,
+  wrongResult,
   expression,
   usedIndices,
   canSubmit,
@@ -110,9 +120,20 @@ export function CalcPad({
         <Text style={expression.length === 0 ? styles.exprPlaceholder : styles.exprText}>
           {expression.length === 0 ? "tap cards & operators…" : expression}
         </Text>
-        <View style={styles.targetPill} accessibilityLabel={`Make ${target}`}>
-          <Text style={styles.targetPillText}>{target}</Text>
-        </View>
+        {(() => {
+          const showWrong = wrongResult != null && Number.isFinite(wrongResult);
+          const pillText = showWrong ? formatPillResult(wrongResult!) : String(target);
+          return (
+            <View
+              style={[styles.targetPill, showWrong && styles.targetPillWrong]}
+              accessibilityLabel={showWrong ? `Your answer makes ${pillText}, not ${target}` : `Make ${target}`}
+            >
+              <Text style={styles.targetPillText} numberOfLines={1} adjustsFontSizeToFit>
+                {pillText}
+              </Text>
+            </View>
+          );
+        })()}
       </View>
       <View style={styles.backspaceRow}>
         <Tappable style={styles.exprBackspace} onPress={tap(onBackspace)} accessibilityLabel="Backspace">
@@ -294,8 +315,10 @@ const styles = StyleSheet.create({
   },
   exprBackspaceText: { fontFamily: fonts.monoMedium, fontSize: 18, color: colors.ink },
   targetPill: {
-    minWidth: 56,
-    paddingHorizontal: 14,
+    // Fixed width (not minWidth) so switching the target for a wrong result like
+    // "19.3" never reflows the row; adjustsFontSizeToFit handles any rare overflow.
+    width: 86,
+    paddingHorizontal: 12,
     paddingVertical: 9,
     backgroundColor: colors.accent,
     borderRadius: radius.lg,
@@ -303,7 +326,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...shadows.accent,
   },
-  targetPillText: { fontFamily: fonts.serifBold, fontSize: 24, color: colors.accentInk },
+  targetPillWrong: { backgroundColor: colors.bad },
+  targetPillText: { fontFamily: fonts.serifBold, fontSize: 24, color: colors.accentInk, textAlign: "center" },
 
   // --- Calculator block -----------------------------------------------------
   block: { flexDirection: "row", alignItems: "stretch", gap: 10 },

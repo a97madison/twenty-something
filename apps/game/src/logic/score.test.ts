@@ -29,6 +29,13 @@ test("negative elapsed (clock skew) is clamped to the max", () => {
   assert.equal(starScore(-5000), MAX_STARS);
 });
 
+test("a correct ~31s solve lands around 4.2 of 5 (leniency calibration)", () => {
+  // A 5/5 run averaging ~31s should read as a strong 4/5: the 2.5 correct floor
+  // plus a healthy speed bonus over the generous 90s window.
+  const s = starScore(31_000);
+  assert.ok(s > 4.15 && s < 4.3, `expected ~4.24, got ${s}`);
+});
+
 test("star score stays within [CORRECT_BASE_STARS, MAX_STARS] and is non-increasing", () => {
   let prev = Infinity;
   for (let t = 0; t <= SLOW_MS + 5000; t += 1000) {

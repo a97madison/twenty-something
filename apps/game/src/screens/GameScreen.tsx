@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import type { Variant } from "@twenty-something/core";
+import { safeEvaluate, type Variant } from "@twenty-something/core";
 import {
   CalcPad,
   colors,
@@ -40,8 +40,8 @@ const SUITS: SuitData[] = [
 const DWELL_OK_MS = 850;
 const DWELL_BAD_MS = 2600;
 
-/** A SOLVE worth this many stars (≈ solved in ≤16s) earns the win flourish. */
-const FLOURISH_STARS = 4.5;
+/** A SOLVE worth this many stars (≈ solved in ≤15s) earns the win flourish. */
+const FLOURISH_STARS = 4.7;
 
 /** True when the next token must be an OPERAND (a card or "(") — start of the
  * expression, or right after an operator or an opening paren. */
@@ -92,12 +92,13 @@ export function GameScreen({ variant, hands, initialStats, haptics = true, onDon
   // Haptic helpers honoring the Settings toggle.
   const buzzOk = () => haptics && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   const buzzBad = () => haptics && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-  const buzzWarn = () => haptics && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
   const buzzWin = () => haptics && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
   const [game, setGame] = useState<GameState>(() => newGame(variant, hands, { now: now(), stats: initialStats }));
   const [tokens, setTokens] = useState<CheckerToken[]>([]);
   const [feedback, setFeedback] = useState<CalcPadFeedback | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  // A wrong submitted answer's value, shown red in the target pill during the dwell.
+  const [wrongResult, setWrongResult] = useState<number | null>(null);
   const [tick, setTick] = useState<number>(() => now());
   // A fast, near-perfect solve fires a one-shot celebration overlay; the nonce
   // re-mounts it so each great solve replays from the start.
@@ -149,6 +150,7 @@ export function GameScreen({ variant, hands, initialStats, haptics = true, onDon
     setPending(null);
     setFeedback(null);
     setCelebrate(false);
+    setWrongResult(null);
     setTokens([]);
     if (next.done) onDone(next);
     else setGame({ ...next, handStartedAt: now() }); // restart the clock for the fresh hand
@@ -180,9 +182,12 @@ export function GameScreen({ variant, hands, initialStats, haptics = true, onDon
       }
       settle(out.state, "ok");
     } else {
-      buzzWarn();
+      buzzBad();
       pulse("bad");
+      const v = safeEvaluate(expr);
+      if (v !== null && Number.isFinite(v)) setWrongResult(v);
       setFeedback({ kind: "bad", text: wrongFeedbackText(out.error, expr, hand.target) });
+      settle(out.state, "bad");
     }
   };
 
@@ -254,6 +259,7 @@ export function GameScreen({ variant, hands, initialStats, haptics = true, onDon
             suitData={SUITS}
             variant={variant}
             target={hand.target}
+            wrongResult={wrongResult}
             expression={tokenStr(tokens, values)}
             usedIndices={usedIndices}
             canSubmit={canSubmit}
