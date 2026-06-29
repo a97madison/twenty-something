@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, Pressable } from "react-native";
 import type { Variant } from "@twenty-something/core";
-import { colors, fonts } from "./theme/tokens";
+import { colors, fonts, shadows } from "./theme/tokens";
 import { PlayingCard, CARD_ASPECT } from "./PlayingCard";
 
 type SuitData = { s: string; red: boolean };
@@ -62,9 +62,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     textAlign: "center",
   },
+  // The transparent pip PNGs sit on a real white card face, like the game's deck.
   card: {
     width: "100%",
     aspectRatio: CARD_ASPECT,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    overflow: "hidden",
+    ...shadows.card,
   },
   cardImg: { width: "100%", height: "100%" },
   idx: { fontFamily: fonts.sans, fontSize: 10, color: colors.inkFaint, marginTop: 4 },
