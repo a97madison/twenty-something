@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Linking, StyleSheet, View } from "react-native";
+import { Linking, Platform, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import type { Variant } from "@twenty-something/core";
@@ -364,6 +364,7 @@ export default function App() {
     <SafeAreaProvider>
       <View style={styles.root}>
         <StatusBar style="dark" />
+        <View style={styles.frame}>
         {screen === "home" && (
           <HomeScreen
             onPlay={() => setScreen("setup")}
@@ -434,11 +435,18 @@ export default function App() {
         )}
         {screen === "privacy" && <PrivacyScreen onBack={() => setScreen("settings")} />}
         {screen === "rooms" && <RoomsScreen variant="24" onBack={() => setScreen("home")} />}
+        </View>
       </View>
     </SafeAreaProvider>
   );
 }
 
+// On web the app runs in a full-width browser; cap it to a phone-width column so
+// the card grid (percentage-width + fixed aspect) doesn't blow up on wide/landscape
+// viewports. On native this frame is a plain passthrough — the app is unchanged.
+const WEB = Platform.OS === "web";
+
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: colors.bg, ...(WEB ? { alignItems: "center" as const } : null) },
+  frame: { flex: 1, width: "100%", ...(WEB ? { maxWidth: 480 } : null) },
 });
