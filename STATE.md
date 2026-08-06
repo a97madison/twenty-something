@@ -7,18 +7,17 @@ Always-loaded spine (auto-injected each session by the SessionStart hook). Keep 
 ## Right now
 - A card arithmetic game (classic **24** + **20-Something** variant, target = 18 + the 4th card) plus companion tools. npm-workspaces monorepo, one tested engine (`@twenty-something/core`) behind every surface.
 - The **game** (`apps/game`) is the focus and is in strong shape: daily challenge, per-variant stats (accuracy / avg time / ★ rating), live rooms, friend challenges, daily percentile all shipped.
-- Web build is HOSTED & LIVE at https://twenty-something-anthonydm.web.app (Firebase Hosting serves the Expo web export; challenge links open in-browser, no install).
+- Web build is HOSTED & LIVE at https://twenty-something-anthonydm.web.app (Firebase Hosting serves the Expo web export; challenge links open in-browser, no install). On web the app is capped to a phone-width column so cards render at phone size instead of stretching (4aa51f8).
 - Daily percentile is LIVE in prod (Firebase project `twenty-something-anthonydm`, us-central1, node22, Blaze).
 
 ## In flight
-- **UNCOMMITTED on main (2026-06-29 session):** playtest fixes (wrong submit now advances the hand), rating leniency recalibration (SLOW_MS 60s to 90s), wrong-result red target pill, cream app icon, calculator white card faces, stats gate copy, `docs/MARKETING.md`. Full suite green (170 tests), both apps driven on iOS sim. Needs commit + merge per CLAUDE.md §6/§7.
-  - When committing: EXCLUDE `apps/game/src/screens/InstructionsScreen.tsx` (modified in tree but from another stream, not this session's work).
+- The 2026-06-29 playtest batch is fully committed and merged: wrong-submit advances the hand + lenient scoring + red result pill (fc3da80), cream app icon (5f087b9), calculator white card faces (0ebe18a), how-to-play worked examples + stats gate copy (bc3eeeb, this also carried InstructionsScreen.tsx), and `docs/MARKETING.md` (2e08931). STATE.md spine added (336d1f6). Latest: web phone-width cap (4aa51f8).
+- Nothing mid-flight right now. Next real work is the EAS dev-build milestone (see Next).
 
 ## Next (priority order)
-1. Commit + merge the 2026-06-29 working-tree changes (branch off main, stage by explicit path, run full suite, merge + push). Exclude InstructionsScreen.tsx.
-2. **EAS dev-build milestone** (the single next real gate): unblocks App Check (App Attest / Play Integrity), OS notification delivery (wire `expo-notifications` to the existing `planNotifications` brain), and App Store / Play distribution. `apps/game/eas.json` exists; remaining steps are all account-gated (`eas login`, Apple Developer + Play Console).
-3. Wire the other two deployed callables to the client (`submitDaily` streak, `submitRoomSolution` rooms) and set their public `allUsers` run.invoker (they 401 until then).
-4. Growth per `docs/MARKETING.md`: image share card as real PNG (gated on dev build), deep links, web landing, concentrated launch week (PH + HN + Reddit).
+1. **EAS dev-build milestone** (the single next real gate): unblocks App Check (App Attest / Play Integrity), OS notification delivery (wire `expo-notifications` to the existing `planNotifications` brain), and App Store / Play distribution. `apps/game/eas.json` exists; remaining steps are all account-gated (`eas login`, Apple Developer + Play Console).
+2. Wire the other two deployed callables to the client (`submitDaily` streak, `submitRoomSolution` rooms) and set their public `allUsers` run.invoker (they 401 until then).
+3. Growth per `docs/MARKETING.md`: image share card as real PNG (gated on dev build), deep links, web landing, concentrated launch week (PH + HN + Reddit).
 
 ## Open questions / blockers
 - **No EAS dev build yet** gates App Check, live notifications, and store distribution. Expo Go cannot do App Attest / Play Integrity / reliable scheduled notifications.
