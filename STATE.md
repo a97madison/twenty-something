@@ -11,7 +11,7 @@ Always-loaded spine (auto-injected each session by the SessionStart hook). Keep 
 - Daily percentile is LIVE in prod (Firebase project `twenty-something-anthonydm`, us-central1, node22, Blaze).
 
 ## In flight
-- The 2026-06-29 playtest batch is fully committed and merged: wrong-submit advances the hand + lenient scoring + red result pill (fc3da80), cream app icon (5f087b9), calculator white card faces (0ebe18a), how-to-play worked examples + stats gate copy (bc3eeeb, this also carried InstructionsScreen.tsx), and `docs/MARKETING.md` (2e08931). STATE.md spine added (336d1f6). Latest: web phone-width cap (4aa51f8).
+- The 2026-06-29 playtest batch is fully committed and merged: wrong-submit advances the hand + lenient scoring + red result pill (fc3da80), cream app icon (5f087b9), calculator white card faces (0ebe18a), how-to-play worked examples + stats gate copy (bc3eeeb, this also carried InstructionsScreen.tsx), and `docs/MARKETING.md` (2e08931). STATE.md spine added (336d1f6). Latest product change: web phone-width cap (4aa51f8); HEAD is b1f18aa, the STATE.md/journal sync.
 - Nothing mid-flight right now. Next real work is the EAS dev-build milestone (see Next).
 
 ## Next (priority order)
