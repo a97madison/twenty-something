@@ -1,0 +1,4 @@
+# Findings reviewed and accepted. One per line: path::rule-id  reason
+# An entry here is a decision with a name on it. If the reason stops being true, delete the line.
+
+apps/game/src/backend/config.ts::key-google  Firebase WEB API key, used only for Identity Toolkit signUp and Secure Token refresh. Google documents these as safe in client code: they identify the project, they do not authorize access. Security is Firestore rules, which are default-deny with no client access.
