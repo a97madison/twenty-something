@@ -44,3 +44,10 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.swp
+
+# Spine and session history stay LOCAL. This repo is public, and a spine is working notes:
+# roadmap, blockers, and in this case a plainly stated live weakness ("anyone can mint an anon
+# token + submit"). notes.md was already local-only; STATE.md and journal/ belong with it.
+# They still exist on disk and still auto-inject at SessionStart. They just are not published.
+STATE.md
+journal/
